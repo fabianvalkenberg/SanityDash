@@ -131,9 +131,6 @@ body {
     justify-content: center;
 }
 
-.task-card--icon:hover .task-actions {
-    opacity: 0;
-}
 
 .column-icon {
     width: 24px;
@@ -146,10 +143,7 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
-}
-
-.task-card--add:hover .task-actions {
-    opacity: 0;
+    transition: background-color 0.5s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .add-btn {
@@ -167,10 +161,6 @@ body {
     width: 19px;
     height: 19px;
     transition: filter 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.task-card--add {
-    transition: background-color 0.5s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .task-card--add:hover {
@@ -201,14 +191,20 @@ body {
 }
 
 /* Staggered load animatie */
+.task-card--icon,
+.task-card--add {
+    opacity: 0;
+    transform: translateY(-20px);
+}
+
 .task-card--loading {
     opacity: 0;
-    transform: translateX(-20px);
+    transform: translateY(-20px);
 }
 
 .task-card--loaded {
     opacity: 1;
-    transform: translateX(0);
+    transform: translateY(0);
     transition: opacity 0.4s ease-out, transform 0.4s ease-out;
 }
 
@@ -354,9 +350,6 @@ body {
     background-color: #626161;
 }
 
-.task-card--completed .task-content {
-    opacity: 1;
-}
 
 .task-card--completed .task-title,
 .task-card--completed .subtask-count,
@@ -366,6 +359,21 @@ body {
 
 .task-card--completed .contact-name {
     color: #444444 !important;
+}
+
+/* Completed hover: rotate-left icoon in plaats van check */
+.task-card--completed.task-card--planning::after,
+.task-card--completed.task-card--contact::after {
+    background-image: url('assets/icons/rotate-left-white.svg');
+}
+
+/* Hover geblokkeerd na klikken - tot muis de kaart verlaat */
+.task-card.hover-blocked::after {
+    opacity: 0 !important;
+}
+
+.task-card.hover-blocked .task-content {
+    opacity: 1 !important;
 }
 
 /* Snap back animatie */

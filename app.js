@@ -96,6 +96,31 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     let isInitialLoad = true;
+    let initialAnimationDone = false;
+
+    function animateInitialCards() {
+        if (initialAnimationDone) return;
+        initialAnimationDone = true;
+
+        // Animeer alle statische kaarten (icon en add buttons)
+        const allStaticCards = document.querySelectorAll('.page--overzicht .task-card--icon, .page--overzicht .task-card--add');
+        allStaticCards.forEach(card => {
+            card.classList.add('task-card--loading');
+        });
+
+        // Start animatie met kleine delay
+        setTimeout(() => {
+            let index = 0;
+            allStaticCards.forEach(card => {
+                const delay = index * 50;
+                index++;
+                setTimeout(() => {
+                    card.classList.remove('task-card--loading');
+                    card.classList.add('task-card--loaded');
+                }, delay);
+            });
+        }, 10);
+    }
 
     function renderAllTasks() {
         const planningGrid = document.querySelector('.page--overzicht .column:nth-child(1) .tasks-grid');
@@ -108,11 +133,20 @@ document.addEventListener('DOMContentLoaded', () => {
             cards.forEach(card => card.remove());
         });
 
+        // Bij eerste load, start met animeren van statische kaarten
+        if (isInitialLoad) {
+            animateInitialCards();
+        }
+
+        // Tel het aantal statische kaarten voor de delay offset
+        const staticCardsCount = document.querySelectorAll('.page--overzicht .task-card--icon, .page--overzicht .task-card--add').length;
+
         let animationIndex = 0;
         const animateCard = (card) => {
             if (isInitialLoad) {
                 card.classList.add('task-card--loading');
-                const delay = animationIndex * 50; // 50ms tussen elke kaart
+                // Start na de statische kaarten
+                const delay = (staticCardsCount + animationIndex) * 50;
                 animationIndex++;
                 setTimeout(() => {
                     card.classList.remove('task-card--loading');
@@ -147,7 +181,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Na eerste load, geen animatie meer
         if (isInitialLoad) {
-            setTimeout(() => { isInitialLoad = false; }, 1000);
+            setTimeout(() => { isInitialLoad = false; }, 2000);
         }
     }
 
@@ -647,9 +681,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 if (tasksData[category] && tasksData[category][index]) {
                     tasksData[category][index].completed = !tasksData[category][index].completed;
+
+                    // Blokkeer hover state tot muis de kaart verlaat
+                    card.classList.add('hover-blocked');
+
                     await saveAllTasks();
                 }
             }
+        });
+
+        // Wanneer muis de kaart verlaat, deblokkeer hover en toon rotate-left voor completed taken
+        card.addEventListener('mouseleave', () => {
+            card.classList.remove('hover-blocked');
         });
     }
 
