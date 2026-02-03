@@ -137,7 +137,7 @@ document.addEventListener('DOMContentLoaded', () => {
         card.innerHTML = `
             <div class="task-content">
                 <span class="task-title">${task.titel}</span>
-                <span class="subtask-count">${task.uren || 1}</span>
+                <span class="subtask-count">${task.uren || '.'}</span>
             </div>
         `;
         attachCardListeners(card);
@@ -558,7 +558,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (isNewTask) {
                 tasksData.planning.push({
                     titel: value,
-                    uren: parseInt(selectedTime) || 1,
+                    uren: selectedTime ? parseInt(selectedTime) : null,
                     completed: false
                 });
             } else {
@@ -566,7 +566,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 tasksData.planning[index] = {
                     ...tasksData.planning[index],
                     titel: value,
-                    uren: parseInt(selectedTime) || 1
+                    uren: selectedTime ? parseInt(selectedTime) : null
                 };
             }
         } else {
@@ -676,7 +676,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     editContactName.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') {
-            editContactTask.focus();
+            saveTask();
         } else if (e.key === 'Escape') {
             closeEditModal();
         }
