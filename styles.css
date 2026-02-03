@@ -82,7 +82,7 @@ body {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 16px;
+    gap: 32px;
     width: 46px;
 }
 
@@ -92,17 +92,25 @@ body {
     justify-content: center;
     width: 46px;
     height: 24px;
+    cursor: pointer;
 }
 
 .sidebar-btn img {
     width: 24px;
     height: 24px;
-    /* Donkergrijs voor niet-actieve items */
-    filter: brightness(0) invert(0.25);
+    /* Bijna zwart - zoals logo */
+    filter: brightness(0) invert(0.1);
+    transition: filter 0.3s ease;
+}
+
+.sidebar-btn:hover img {
+    /* Oranje-rood accent kleur */
+    filter: invert(35%) sepia(93%) saturate(1479%) hue-rotate(351deg) brightness(97%) contrast(95%);
 }
 
 .sidebar-btn--active img {
-    filter: brightness(0) invert(1);
+    /* Oranje-rood accent kleur */
+    filter: invert(35%) sepia(93%) saturate(1479%) hue-rotate(351deg) brightness(97%) contrast(95%);
 }
 
 /* Kolommen layout */
