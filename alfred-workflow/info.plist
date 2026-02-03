@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>bundleid</key>
+	<string>com.sanitydash.quickadd</string>
+	<key>connections</key>
+	<dict>
+		<key>5A8A9B1C-1234-5678-9ABC-DEF012345678</key>
+		<array>
+			<dict>
+				<key>destinationuid</key>
+				<string>6B9B0C2D-2345-6789-ABCD-EF0123456789</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>vitoaliasuid</key>
+				<string></string>
+			</dict>
+		</array>
+	</dict>
+	<key>createdby</key>
+	<string>SanityDash</string>
+	<key>description</key>
+	<string>Snel taken toevoegen aan SanityDash</string>
+	<key>disabled</key>
+	<false/>
+	<key>name</key>
+	<string>SanityDash Quick Add</string>
+	<key>objects</key>
+	<array>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>argumenttype</key>
+				<integer>0</integer>
+				<key>keyword</key>
+				<string>.</string>
+				<key>subtext</key>
+				<string>Voeg een taak toe aan SanityDash</string>
+				<key>text</key>
+				<string>SanityDash</string>
+				<key>withspace</key>
+				<true/>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.input.keyword</string>
+			<key>uid</key>
+			<string>5A8A9B1C-1234-5678-9ABC-DEF012345678</string>
+			<key>version</key>
+			<integer>1</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>concurrently</key>
+				<false/>
+				<key>escaping</key>
+				<integer>102</integer>
+				<key>script</key>
+				<string>curl -s "https://sanitydash.vercel.app/api/quick-add?task={query}"</string>
+				<key>scriptargtype</key>
+				<integer>0</integer>
+				<key>scriptfile</key>
+				<string></string>
+				<key>type</key>
+				<integer>0</integer>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.action.script</string>
+			<key>uid</key>
+			<string>6B9B0C2D-2345-6789-ABCD-EF0123456789</string>
+			<key>version</key>
+			<integer>2</integer>
+		</dict>
+	</array>
+	<key>readme</key>
+	<string>Gebruik: . gevolgd door je taak
+
+Voorbeelden:
+. Boodschappen doen
+. Rapport schrijven
+
+De taak wordt direct toegevoegd aan de Planning kolom in SanityDash.</string>
+	<key>uidata</key>
+	<dict>
+		<key>5A8A9B1C-1234-5678-9ABC-DEF012345678</key>
+		<dict>
+			<key>xpos</key>
+			<real>100</real>
+			<key>ypos</key>
+			<real>100</real>
+		</dict>
+		<key>6B9B0C2D-2345-6789-ABCD-EF0123456789</key>
+		<dict>
+			<key>xpos</key>
+			<real>300</real>
+			<key>ypos</key>
+			<real>100</real>
+		</dict>
+	</dict>
+	<key>version</key>
+	<string>1.0.0</string>
+	<key>webaddress</key>
+	<string></string>
+</dict>
+</plist>
