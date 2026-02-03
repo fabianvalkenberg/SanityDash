@@ -58,7 +58,10 @@ export default async function handler(req, res) {
         };
 
         if (docSnap.exists()) {
-            tasks = docSnap.data();
+            const data = docSnap.data();
+            tasks.planning = data.planning || [];
+            tasks.bellen = data.bellen || [];
+            tasks.mailen = data.mailen || [];
         }
 
         // Voeg nieuwe taak toe
