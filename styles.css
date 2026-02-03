@@ -1,0 +1,643 @@
+/* Font-face configuratie */
+@font-face {
+    font-family: 'Zalando Sans';
+    src: url('assets/typography/Zalando_Sans/ZalandoSans-Regular.ttf') format('truetype');
+    font-weight: 400;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'Zalando Sans';
+    src: url('assets/typography/Zalando_Sans/ZalandoSans-Light.ttf') format('truetype');
+    font-weight: 300;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'Zalando Sans';
+    src: url('assets/typography/Zalando_Sans/ZalandoSans-Bold.ttf') format('truetype');
+    font-weight: 700;
+    font-style: normal;
+}
+
+/* CSS Variabelen */
+:root {
+    --color-light-gray: #DFDFDF;
+    --color-medium-gray: #626161;
+    --color-dark-gray: #434343;
+    --color-accent: #F8602D;
+    --color-white: #FFFFFF;
+
+    --font-family: 'Zalando Sans', sans-serif;
+    --font-size-base: 16px;
+    --font-weight-normal: 400;
+    --letter-spacing: -0.48px;
+
+    --card-width: 142px;
+    --card-padding: 16px;
+    --card-gap: 1px;
+}
+
+/* Reset en basis styling */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: var(--font-family);
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-normal);
+    letter-spacing: var(--letter-spacing);
+    background-color: var(--color-medium-gray);
+    min-height: 100vh;
+}
+
+/* Dashboard layout */
+.dashboard {
+    display: flex;
+    padding: 32px;
+    gap: 32px;
+}
+
+/* Sidebar */
+.sidebar {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 32px;
+    width: 46px;
+}
+
+.logo img {
+    width: 46px;
+    height: 39px;
+}
+
+.sidebar-nav {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    width: 46px;
+}
+
+.sidebar-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 46px;
+    height: 24px;
+}
+
+.sidebar-btn img {
+    width: 24px;
+    height: 24px;
+    /* Donkergrijs voor niet-actieve items */
+    filter: brightness(0) invert(0.25);
+}
+
+.sidebar-btn--active img {
+    filter: brightness(0) invert(1);
+}
+
+/* Kolommen layout */
+.columns {
+    display: flex;
+    gap: 32px;
+}
+
+.column {
+    flex: 1;
+    max-width: 300px;
+}
+
+/* Icoon kaartje */
+.task-card--icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.task-card--icon:hover .task-actions {
+    opacity: 0;
+}
+
+.column-icon {
+    width: 24px;
+    height: 24px;
+    filter: invert(35%) sepia(93%) saturate(1479%) hue-rotate(351deg) brightness(97%) contrast(95%);
+}
+
+/* Plus knop kaartje */
+.task-card--add {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.task-card--add:hover .task-actions {
+    opacity: 0;
+}
+
+.add-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.add-btn img {
+    width: 19px;
+    height: 19px;
+    transition: filter 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.task-card--add {
+    transition: background-color 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.task-card--add:hover {
+    background-color: var(--color-accent);
+}
+
+.task-card--add:hover .add-btn img {
+    filter: brightness(0) invert(1);
+}
+
+/* Tasks grid */
+.tasks-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--card-gap);
+    width: calc(var(--card-width) * 2 + var(--card-gap));
+}
+
+/* Taakkaartjes basis */
+.task-card {
+    width: var(--card-width);
+    min-height: 111px;
+    background-color: var(--color-white);
+    display: flex;
+    position: relative;
+    overflow: hidden;
+    outline: 1px solid #767676;
+}
+
+.task-card .task-content {
+    width: 100%;
+    padding: var(--card-padding);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    min-height: 111px;
+    transition: transform 0.2s ease;
+}
+
+/* Hover overlay - volledig oranje met check icon */
+.task-card--planning,
+.task-card--contact {
+    cursor: pointer;
+    user-select: none;
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.task-card--planning::after,
+.task-card--contact::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: var(--color-accent);
+    background-image: url('assets/icons/check-circle-white.svg');
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: 32px 32px;
+    opacity: 0;
+    transition: opacity 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+    pointer-events: none;
+}
+
+.task-card--planning:hover::after,
+.task-card--contact:hover::after {
+    opacity: 1;
+}
+
+.task-card--planning .task-content,
+.task-card--contact .task-content {
+    transition: opacity 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.task-card--planning:hover .task-content,
+.task-card--contact:hover .task-content {
+    opacity: 0;
+}
+
+/* Dragging state */
+.task-card.dragging {
+    position: fixed;
+    z-index: 1001;
+    box-shadow: 0 25px 50px rgba(0, 0, 0, 0.35);
+    pointer-events: none;
+    transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    /* Scherpe tekst behouden */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+    transform-origin: center center;
+}
+
+.task-card.dragging::after {
+    opacity: 0 !important;
+}
+
+.task-card.dragging .task-content {
+    opacity: 1 !important;
+}
+
+/* Placeholder waar kaart vandaan komt */
+.task-card-placeholder {
+    width: var(--card-width);
+    min-height: 111px;
+    background-color: rgba(136, 136, 136, 0.3);
+    outline: 1px solid #767676;
+}
+
+/* Drop zone voor bewerken */
+.edit-drop-zone {
+    position: fixed;
+    left: 50%;
+    transform: translateX(-50%);
+    width: calc(100% - 200px);
+    max-width: 900px;
+    border: 2px dashed var(--color-light-gray);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1), visibility 0.3s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.2s ease;
+    z-index: 999;
+}
+
+.edit-drop-zone.visible {
+    opacity: 1;
+    visibility: visible;
+}
+
+.edit-drop-zone.drag-over {
+    border-color: var(--color-accent);
+    background-color: rgba(248, 96, 45, 0.1);
+}
+
+.edit-drop-zone img {
+    width: 32px;
+    height: 32px;
+    opacity: 0.5;
+}
+
+.edit-drop-zone.drag-over img {
+    opacity: 1;
+    filter: invert(35%) sepia(93%) saturate(1479%) hue-rotate(351deg) brightness(97%) contrast(95%);
+}
+
+/* Planning taakkaartjes */
+.task-card--planning .task-title {
+    color: var(--color-dark-gray);
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-normal);
+    line-height: normal;
+}
+
+.task-card--planning .subtask-count {
+    font-size: 12px;
+    color: var(--color-accent);
+    background-color: transparent;
+    width: fit-content;
+    line-height: 1;
+}
+
+/* Afgevinkt state */
+.task-card--completed {
+    background-color: #626161;
+}
+
+.task-card--completed .task-content {
+    opacity: 1;
+}
+
+.task-card--completed .task-title,
+.task-card--completed .subtask-count,
+.task-card--completed .task-description {
+    color: #444444;
+}
+
+.task-card--completed .contact-name {
+    color: #444444 !important;
+}
+
+/* Snap back animatie */
+.task-card.snapping-back {
+    transition: transform 0.35s cubic-bezier(0.25, 0.1, 0.25, 1), box-shadow 0.35s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    box-shadow: none !important;
+}
+
+/* Contact taakkaartjes */
+.task-card--contact {
+    justify-content: flex-start;
+}
+
+.task-card--contact p {
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-normal);
+    line-height: normal;
+    display: flex;
+    flex-direction: column;
+}
+
+.task-card--contact .contact-name {
+    color: var(--color-accent);
+    display: block;
+}
+
+.task-card--contact .task-description {
+    color: var(--color-dark-gray);
+    display: block;
+}
+
+/* Edit Modal */
+.edit-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: var(--color-medium-gray);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1), visibility 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 1000;
+}
+
+.edit-modal.active {
+    opacity: 1;
+    visibility: visible;
+}
+
+.edit-modal-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 24px;
+    transform: translateY(20px) scale(0.95);
+    opacity: 0;
+    transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.edit-modal.active .edit-modal-content {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+}
+
+.edit-input {
+    font-family: var(--font-family);
+    font-size: 40px;
+    font-weight: 300;
+    letter-spacing: var(--letter-spacing);
+    color: var(--color-white);
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid #777676;
+    padding: 8px 0;
+    width: 800px;
+    text-align: center;
+    outline: none;
+}
+
+.edit-input::placeholder {
+    color: var(--color-light-gray);
+}
+
+/* Time selector */
+.edit-time-selector {
+    display: flex;
+    gap: 8px;
+    opacity: 0;
+    transform: translateY(10px);
+    transition: opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1) 0.1s, transform 0.4s cubic-bezier(0.4, 0, 0.2, 1) 0.1s;
+}
+
+.edit-modal.active .edit-time-selector {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.edit-time-selector.hidden {
+    display: none;
+}
+
+.time-btn {
+    width: 48px;
+    height: 48px;
+    border-radius: 8px;
+    border: none;
+    background-color: var(--color-dark-gray);
+    color: var(--color-white);
+    font-family: var(--font-family);
+    font-size: 18px;
+    font-weight: var(--font-weight-normal);
+    cursor: pointer;
+    transition: background-color 0.3s cubic-bezier(0.4, 0, 0.2, 1), color 0.3s cubic-bezier(0.4, 0, 0.2, 1), transform 0.2s ease;
+}
+
+.time-btn:hover {
+    transform: scale(1.05);
+}
+
+.time-btn.selected {
+    background-color: var(--color-accent);
+    color: var(--color-white);
+}
+
+/* Contact input fields */
+.edit-contact-fields {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    opacity: 0;
+    transform: translateY(10px);
+    transition: opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1), transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.edit-modal.active .edit-contact-fields {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.edit-contact-fields.hidden {
+    display: none;
+}
+
+.edit-contact-fields .edit-input {
+    width: 800px;
+}
+
+/* Edit actions */
+.edit-actions {
+    display: none;
+    width: calc(var(--card-width) * 2);
+    opacity: 0;
+    transform: translateY(10px);
+    transition: opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1) 0.2s, transform 0.4s cubic-bezier(0.4, 0, 0.2, 1) 0.2s;
+}
+
+.edit-modal.active .edit-actions {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.edit-action-btn {
+    flex: 1;
+    height: 80px;
+    border: none;
+    background-color: var(--color-white);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background-color 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.edit-action-btn img {
+    width: 24px;
+    height: 24px;
+    transition: filter 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.edit-action-btn:hover {
+    background-color: var(--color-accent);
+}
+
+.edit-action-btn:hover img {
+    filter: brightness(0) invert(1);
+}
+
+/* New task animation */
+.task-card.task-card--new {
+    animation: taskAppear 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+@keyframes taskAppear {
+    from {
+        opacity: 0;
+        transform: translateY(20px) scale(0.9);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+/* Page visibility */
+.page {
+    display: none;
+    flex: 1;
+}
+
+.page.active {
+    display: flex;
+}
+
+/* Invoer pagina */
+.page--invoer {
+    align-items: center;
+    justify-content: center;
+    padding: 32px;
+}
+
+.invoer-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 24px;
+    width: 100%;
+}
+
+.invoer-textarea {
+    width: 800px;
+    min-height: 200px;
+    padding: 8px 0;
+    font-family: var(--font-family);
+    font-size: 20px;
+    font-weight: 300;
+    letter-spacing: var(--letter-spacing);
+    color: var(--color-white);
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid #777676;
+    resize: none;
+    outline: none;
+    text-align: center;
+}
+
+.invoer-textarea::placeholder {
+    color: #777676;
+}
+
+/* Profiel pagina */
+.page--profiel {
+    align-items: center;
+    justify-content: center;
+    padding: 32px;
+}
+
+.profiel-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 24px;
+    width: 100%;
+}
+
+.profiel-textarea {
+    width: 800px;
+    min-height: 200px;
+    padding: 8px 0;
+    font-family: var(--font-family);
+    font-size: 20px;
+    font-weight: 300;
+    letter-spacing: var(--letter-spacing);
+    color: var(--color-white);
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid #777676;
+    resize: none;
+    outline: none;
+    text-align: center;
+}
+
+.profiel-textarea::placeholder {
+    color: #777676;
+}
+
+/* Overzicht pagina */
+.page--overzicht {
+    flex-direction: column;
+}
+
+.page--overzicht .columns {
+    display: flex;
+    gap: 32px;
+}

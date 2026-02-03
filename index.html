@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SanityDash - Todo App</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="dashboard">
+        <aside class="sidebar">
+            <div class="logo">
+                <img src="assets/logo/logo.svg" alt="SanityDash Logo">
+            </div>
+            <nav class="sidebar-nav">
+                <a href="#" class="sidebar-btn" data-page="invoer">
+                    <img src="assets/icons/chat-circle-plus.svg" alt="Invoer">
+                </a>
+                <a href="#" class="sidebar-btn sidebar-btn--active" data-page="overzicht">
+                    <img src="assets/icons/pinpaper.svg" alt="Overzicht">
+                </a>
+                <a href="#" class="sidebar-btn" data-page="profiel">
+                    <img src="assets/icons/profile.svg" alt="Profiel">
+                </a>
+            </nav>
+        </aside>
+
+        <!-- INVOER PAGINA -->
+        <main class="page page--invoer" id="pageInvoer">
+            <div class="invoer-container">
+                <textarea class="invoer-textarea" id="transcriptInput" placeholder="Plak hier je transcript of notities..."></textarea>
+            </div>
+        </main>
+
+        <!-- PROFIEL PAGINA -->
+        <main class="page page--profiel" id="pageProfiel">
+            <div class="profiel-container">
+                <textarea class="profiel-textarea" id="contactenTextarea" placeholder="Voer hier alle namen in, gescheiden door een komma..."></textarea>
+            </div>
+        </main>
+
+        <!-- OVERZICHT PAGINA -->
+        <main class="page page--overzicht active" id="pageOverzicht">
+        <div class="columns">
+            <!-- PLANNEN kolom -->
+            <section class="column">
+                <div class="tasks-grid">
+                    <div class="task-card task-card--icon">
+                        <img src="assets/icons/calendar-date.svg" alt="Plannen" class="column-icon">
+                    </div>
+                    <!-- Taken worden dynamisch geladen -->
+                    <div class="task-card task-card--add">
+                        <button class="add-btn"><img src="assets/icons/add.svg" alt="Toevoegen"></button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- BELLEN kolom -->
+            <section class="column">
+                <div class="tasks-grid">
+                    <div class="task-card task-card--icon">
+                        <img src="assets/icons/call.svg" alt="Bellen" class="column-icon">
+                    </div>
+                    <!-- Taken worden dynamisch geladen -->
+                    <div class="task-card task-card--add">
+                        <button class="add-btn"><img src="assets/icons/add.svg" alt="Toevoegen"></button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- MAILEN kolom -->
+            <section class="column">
+                <div class="tasks-grid">
+                    <div class="task-card task-card--icon">
+                        <img src="assets/icons/message.svg" alt="Mailen" class="column-icon">
+                    </div>
+                    <!-- Taken worden dynamisch geladen -->
+                    <div class="task-card task-card--add">
+                        <button class="add-btn"><img src="assets/icons/add.svg" alt="Toevoegen"></button>
+                    </div>
+                </div>
+            </section>
+        </div>
+        </main>
+    </div>
+
+    <!-- Edit Drop Zone -->
+    <div class="edit-drop-zone" id="editDropZone">
+        <img src="assets/icons/edit.svg" alt="Bewerken">
+    </div>
+
+    <!-- Edit Modal -->
+    <div class="edit-modal" id="editModal">
+        <div class="edit-modal-content">
+            <!-- Planning task input (single field) -->
+            <input type="text" class="edit-input" id="editInput" placeholder="Taak">
+
+            <!-- Contact task inputs (two fields) -->
+            <div class="edit-contact-fields hidden" id="contactFields">
+                <input type="text" class="edit-input" id="editContactName" placeholder="Wie">
+                <input type="text" class="edit-input" id="editContactTask" placeholder="Taak">
+            </div>
+
+            <div class="edit-time-selector" id="timeSelector">
+                <button class="time-btn" data-time="1">1</button>
+                <button class="time-btn" data-time="2">2</button>
+                <button class="time-btn" data-time="3">3</button>
+                <button class="time-btn" data-time="6">6</button>
+            </div>
+            <div class="edit-actions">
+                <button class="edit-action-btn edit-action-btn--confirm" id="editConfirm">
+                    <img src="assets/icons/arrow-right.svg" alt="Bevestigen">
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="app.js"></script>
+</body>
+</html>

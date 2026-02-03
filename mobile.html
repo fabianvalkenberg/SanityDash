@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>SanityDash</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        body {
+            min-height: 100vh;
+            min-height: -webkit-fill-available;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+        }
+
+        .mobile-container {
+            width: 100%;
+            max-width: 500px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 32px;
+        }
+
+        .mobile-input {
+            width: 100%;
+            padding: 16px 0;
+            font-family: var(--font-family);
+            font-size: 24px;
+            font-weight: 300;
+            letter-spacing: var(--letter-spacing);
+            color: var(--color-white);
+            background: transparent;
+            border: none;
+            border-bottom: 1px solid #777676;
+            outline: none;
+            text-align: center;
+        }
+
+        .mobile-input::placeholder {
+            color: #777676;
+        }
+
+        .mobile-actions {
+            display: flex;
+            gap: 16px;
+            width: 100%;
+        }
+
+        .mobile-btn {
+            flex: 1;
+            height: 64px;
+            border: none;
+            background: transparent;
+            border: 1px solid #777676;
+            border-radius: 8px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+        }
+
+        .mobile-btn img {
+            width: 24px;
+            height: 24px;
+            filter: brightness(0) invert(0.5);
+            transition: filter 0.3s ease;
+        }
+
+        .mobile-btn:active,
+        .mobile-btn.recording {
+            background: var(--color-accent);
+            border-color: var(--color-accent);
+        }
+
+        .mobile-btn:active img,
+        .mobile-btn.recording img {
+            filter: brightness(0) invert(1);
+        }
+
+        .mobile-feedback {
+            font-family: var(--font-family);
+            font-size: 14px;
+            font-weight: 300;
+            color: #777676;
+            text-align: center;
+            min-height: 20px;
+        }
+
+        .mobile-feedback.success {
+            color: var(--color-accent);
+        }
+
+        .category-selector {
+            display: flex;
+            gap: 8px;
+            width: 100%;
+        }
+
+        .category-btn {
+            flex: 1;
+            padding: 12px 8px;
+            border: 1px solid #777676;
+            border-radius: 8px;
+            background: transparent;
+            font-family: var(--font-family);
+            font-size: 14px;
+            font-weight: 300;
+            color: #777676;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .category-btn.active {
+            background: var(--color-accent);
+            border-color: var(--color-accent);
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="mobile-container">
+        <input type="text" class="mobile-input" id="taskInput" placeholder="Nieuwe taak..." autofocus>
+
+        <div class="category-selector">
+            <button class="category-btn active" data-category="planning">Plannen</button>
+            <button class="category-btn" data-category="bellen">Bellen</button>
+            <button class="category-btn" data-category="mailen">Mailen</button>
+        </div>
+
+        <div class="mobile-actions">
+            <button class="mobile-btn" id="micBtn">
+                <img src="assets/icons/mic.svg" alt="Spraak" id="micIcon">
+            </button>
+            <button class="mobile-btn" id="sendBtn">
+                <img src="assets/icons/arrow-right.svg" alt="Verstuur">
+            </button>
+        </div>
+
+        <div class="mobile-feedback" id="feedback"></div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+        // Firebase config
+        const firebaseConfig = {
+            apiKey: "AIzaSyCaqrEmvJ-3EZ8Tnt4HLFd2gMb-j5rhkA4",
+            authDomain: "sanitydash-aff6a.firebaseapp.com",
+            projectId: "sanitydash-aff6a",
+            storageBucket: "sanitydash-aff6a.firebasestorage.app",
+            messagingSenderId: "1096864734708",
+            appId: "1:1096864734708:web:6c39d6b6dfb6837da72da1"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        const taskInput = document.getElementById('taskInput');
+        const sendBtn = document.getElementById('sendBtn');
+        const micBtn = document.getElementById('micBtn');
+        const feedback = document.getElementById('feedback');
+        const categoryBtns = document.querySelectorAll('.category-btn');
+
+        let selectedCategory = 'planning';
+        let recognition = null;
+        let isRecording = false;
+
+        // Category selection
+        categoryBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                categoryBtns.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                selectedCategory = btn.dataset.category;
+            });
+        });
+
+        // Get tasks from Firebase
+        async function getTasks() {
+            try {
+                const docRef = doc(db, 'tasks', 'main');
+                const docSnap = await getDoc(docRef);
+                if (docSnap.exists()) {
+                    return docSnap.data();
+                }
+            } catch (error) {
+                console.error('Error loading tasks:', error);
+            }
+            return {
+                planning: [],
+                bellen: [],
+                mailen: []
+            };
+        }
+
+        // Save tasks to Firebase
+        async function saveTasks(tasks) {
+            try {
+                const docRef = doc(db, 'tasks', 'main');
+                await setDoc(docRef, {
+                    ...tasks,
+                    updatedAt: new Date().toISOString()
+                });
+                return true;
+            } catch (error) {
+                console.error('Error saving tasks:', error);
+                return false;
+            }
+        }
+
+        // Add task
+        async function addTask(text) {
+            if (!text.trim()) return;
+
+            feedback.textContent = 'Opslaan...';
+
+            const tasks = await getTasks();
+
+            if (selectedCategory === 'planning') {
+                tasks.planning.push({
+                    titel: text.trim(),
+                    uren: 1,
+                    completed: false
+                });
+            } else {
+                // Voor bellen/mailen, probeer naam en taak te splitsen
+                const parts = text.split(':');
+                if (parts.length > 1) {
+                    tasks[selectedCategory].push({
+                        naam: parts[0].trim(),
+                        taak: parts.slice(1).join(':').trim(),
+                        completed: false
+                    });
+                } else {
+                    tasks[selectedCategory].push({
+                        naam: text.trim(),
+                        taak: '',
+                        completed: false
+                    });
+                }
+            }
+
+            const success = await saveTasks(tasks);
+
+            taskInput.value = '';
+
+            if (success) {
+                showFeedback('Taak toegevoegd!');
+            } else {
+                showFeedback('Fout bij opslaan');
+            }
+        }
+
+        function showFeedback(message) {
+            feedback.textContent = message;
+            feedback.classList.add('success');
+            setTimeout(() => {
+                feedback.textContent = '';
+                feedback.classList.remove('success');
+            }, 2000);
+        }
+
+        // Send button
+        sendBtn.addEventListener('click', () => {
+            addTask(taskInput.value);
+        });
+
+        // Enter key
+        taskInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                addTask(taskInput.value);
+            }
+        });
+
+        // Speech recognition
+        if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            recognition = new SpeechRecognition();
+            recognition.lang = 'nl-NL';
+            recognition.continuous = false;
+            recognition.interimResults = true;
+
+            recognition.onstart = () => {
+                isRecording = true;
+                micBtn.classList.add('recording');
+                feedback.textContent = 'Luisteren...';
+            };
+
+            recognition.onresult = (event) => {
+                const transcript = event.results[0][0].transcript;
+                taskInput.value = transcript;
+            };
+
+            recognition.onend = () => {
+                isRecording = false;
+                micBtn.classList.remove('recording');
+                feedback.textContent = '';
+            };
+
+            recognition.onerror = (event) => {
+                isRecording = false;
+                micBtn.classList.remove('recording');
+                feedback.textContent = 'Fout: ' + event.error;
+            };
+
+            micBtn.addEventListener('click', () => {
+                if (isRecording) {
+                    recognition.stop();
+                } else {
+                    recognition.start();
+                }
+            });
+        } else {
+            micBtn.style.display = 'none';
+            feedback.textContent = 'Spraak niet ondersteund';
+        }
+    </script>
+</body>
+</html>
