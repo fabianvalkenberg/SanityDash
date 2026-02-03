@@ -59,7 +59,7 @@
 				<key>escaping</key>
 				<integer>102</integer>
 				<key>script</key>
-				<string>curl -s "https://sanitydash.vercel.app/api/quick-add?task={query}"</string>
+				<string>curl -s "https://sanity-dash.vercel.app/api/quick-add?task={query}"</string>
 				<key>scriptargtype</key>
 				<integer>0</integer>
 				<key>scriptfile</key>
