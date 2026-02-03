@@ -95,6 +95,8 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    let isInitialLoad = true;
+
     function renderAllTasks() {
         const planningGrid = document.querySelector('.page--overzicht .column:nth-child(1) .tasks-grid');
         const bellenGrid = document.querySelector('.page--overzicht .column:nth-child(2) .tasks-grid');
@@ -106,10 +108,24 @@ document.addEventListener('DOMContentLoaded', () => {
             cards.forEach(card => card.remove());
         });
 
+        let animationIndex = 0;
+        const animateCard = (card) => {
+            if (isInitialLoad) {
+                card.classList.add('task-card--loading');
+                const delay = animationIndex * 50; // 50ms tussen elke kaart
+                animationIndex++;
+                setTimeout(() => {
+                    card.classList.remove('task-card--loading');
+                    card.classList.add('task-card--loaded');
+                }, delay + 10);
+            }
+        };
+
         // Render planning taken
         const planningAddBtn = planningGrid.querySelector('.task-card--add');
         tasksData.planning.forEach((task, index) => {
             const card = createPlanningCard(task, index);
+            animateCard(card);
             planningGrid.insertBefore(card, planningAddBtn);
         });
 
@@ -117,6 +133,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const bellenAddBtn = bellenGrid.querySelector('.task-card--add');
         tasksData.bellen.forEach((task, index) => {
             const card = createContactCard(task, index, 'bellen');
+            animateCard(card);
             bellenGrid.insertBefore(card, bellenAddBtn);
         });
 
@@ -124,8 +141,14 @@ document.addEventListener('DOMContentLoaded', () => {
         const mailenAddBtn = mailenGrid.querySelector('.task-card--add');
         tasksData.mailen.forEach((task, index) => {
             const card = createContactCard(task, index, 'mailen');
+            animateCard(card);
             mailenGrid.insertBefore(card, mailenAddBtn);
         });
+
+        // Na eerste load, geen animatie meer
+        if (isInitialLoad) {
+            setTimeout(() => { isInitialLoad = false; }, 1000);
+        }
     }
 
     function createPlanningCard(task, index) {
@@ -506,9 +529,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 const taskData = tasksData.planning[index];
                 if (taskData) {
                     editInput.value = taskData.titel;
-                    selectedTime = String(taskData.uren || 1);
+                    selectedTime = taskData.uren ? String(taskData.uren) : null;
                     timeBtns.forEach(btn => {
-                        if (btn.dataset.time === selectedTime) {
+                        if (selectedTime && btn.dataset.time === selectedTime) {
                             btn.classList.add('selected');
                         } else {
                             btn.classList.remove('selected');
