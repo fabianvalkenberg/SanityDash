@@ -189,33 +189,33 @@ document.addEventListener('DOMContentLoaded', () => {
     // ===================
     // TRANSCRIPT PROCESSING
     // ===================
-    function getAIPrompt() {
-        return `Je bent een assistent die transcripts analyseert en taken extraheert.
 
-BEKENDE CONTACTEN:
-${contacten.length > 0 ? contacten.join(', ') : 'Geen contacten opgegeven'}
+    async function parseTranscriptWithAI(transcript) {
+        try {
+            const response = await fetch('/api/parse-transcript', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    transcript: transcript,
+                    contacten: contacten
+                })
+            });
 
-INSTRUCTIES:
-Analyseer het transcript en extraheer alle taken. Categoriseer elke taak in één van deze drie categorieën:
+            if (!response.ok) {
+                throw new Error('API request failed');
+            }
 
-1. PLANNEN - Taken die tijd kosten om uit te voeren (projecten, administratie, etc.)
-   - Schat de tijd in: 1, 2, 3, of 6 uur
-
-2. BELLEN - Taken waarbij iemand gebeld moet worden
-   - Koppel aan bekende contacten indien mogelijk
-
-3. MAILEN - Taken waarbij een e-mail gestuurd moet worden
-   - Koppel aan bekende contacten indien mogelijk
-
-Geef je antwoord in dit exacte JSON formaat:
-{
-  "planning": [{"titel": "Taaknaam", "uren": 2}],
-  "bellen": [{"naam": "Contactnaam", "taak": "Korte beschrijving"}],
-  "mailen": [{"naam": "Contactnaam", "taak": "Korte beschrijving"}]
-}`;
+            return await response.json();
+        } catch (error) {
+            console.error('AI parsing failed, using fallback:', error);
+            return parseTranscriptFallback(transcript);
+        }
     }
 
-    function parseTranscript(transcript) {
+    // Fallback parser als API niet beschikbaar is
+    function parseTranscriptFallback(transcript) {
         const result = {
             planning: [],
             bellen: [],
@@ -224,13 +224,13 @@ Geef je antwoord in dit exacte JSON formaat:
 
         const lines = transcript.toLowerCase();
 
-        // Zoek naar bel-taken
         if (lines.includes('bellen') || lines.includes('bel ')) {
             contacten.forEach(contact => {
                 if (lines.includes(contact.toLowerCase())) {
                     result.bellen.push({
                         naam: contact,
-                        taak: 'Opvolging gesprek'
+                        taak: 'Opvolging gesprek',
+                        completed: false
                     });
                 }
             });
@@ -241,13 +241,13 @@ Geef je antwoord in dit exacte JSON formaat:
                 if (lines.includes(contact.toLowerCase())) {
                     result.mailen.push({
                         naam: contact,
-                        taak: 'E-mail sturen'
+                        taak: 'E-mail sturen',
+                        completed: false
                     });
                 }
             });
         }
 
-        // Zoek naar taken met tijdsindicatie
         const timeMatch = transcript.match(/(\d+)\s*(?:uur|u(?:ur)?)/gi);
         if (timeMatch) {
             const hours = parseInt(timeMatch[0]);
@@ -260,7 +260,8 @@ Geef je antwoord in dit exacte JSON formaat:
                     if (cleanTask.length > 5) {
                         result.planning.push({
                             titel: cleanTask,
-                            uren: validHours
+                            uren: validHours,
+                            completed: false
                         });
                     }
                 }
@@ -271,10 +272,12 @@ Geef je antwoord in dit exacte JSON formaat:
     }
 
     async function addTasksFromTranscript(tasks) {
-        // Voeg nieuwe taken toe aan bestaande data
-        tasksData.planning = [...tasksData.planning, ...tasks.planning];
-        tasksData.bellen = [...tasksData.bellen, ...tasks.bellen];
-        tasksData.mailen = [...tasksData.mailen, ...tasks.mailen];
+        // Voeg completed: false toe aan alle taken
+        const addCompleted = (arr) => arr.map(t => ({ ...t, completed: false }));
+
+        tasksData.planning = [...tasksData.planning, ...addCompleted(tasks.planning || [])];
+        tasksData.bellen = [...tasksData.bellen, ...addCompleted(tasks.bellen || [])];
+        tasksData.mailen = [...tasksData.mailen, ...addCompleted(tasks.mailen || [])];
 
         await saveAllTasks();
     }
@@ -286,14 +289,22 @@ Geef je antwoord in dit exacte JSON formaat:
                 const transcript = transcriptInput.value.trim();
                 if (!transcript) return;
 
-                const tasks = parseTranscript(transcript);
-                await addTasksFromTranscript(tasks);
+                // Toon loading state
+                transcriptInput.disabled = true;
+                transcriptInput.placeholder = 'Analyseren...';
 
-                transcriptInput.value = '';
-                switchPage('overzicht');
-
-                console.log('AI Prompt:', getAIPrompt());
-                console.log('Parsed tasks:', tasks);
+                try {
+                    const tasks = await parseTranscriptWithAI(transcript);
+                    await addTasksFromTranscript(tasks);
+                    transcriptInput.value = '';
+                    switchPage('overzicht');
+                } catch (error) {
+                    console.error('Error processing transcript:', error);
+                    alert('Er ging iets mis bij het verwerken van het transcript.');
+                } finally {
+                    transcriptInput.disabled = false;
+                    transcriptInput.placeholder = 'Plak hier je transcript of notities...';
+                }
             }
         });
     }
