@@ -45,6 +45,13 @@ document.addEventListener('DOMContentLoaded', () => {
         mailen: []
     };
 
+    // Vorige staat voor detectie van nieuwe taken
+    let previousTaskCounts = {
+        planning: 0,
+        bellen: 0,
+        mailen: 0
+    };
+
     // Contacten data
     let contacten = [];
 
@@ -127,6 +134,19 @@ document.addEventListener('DOMContentLoaded', () => {
         const bellenGrid = document.querySelector('.page--overzicht .column:nth-child(2) .tasks-grid');
         const mailenGrid = document.querySelector('.page--overzicht .column:nth-child(3) .tasks-grid');
 
+        // Detecteer nieuwe taken
+        const newTaskIndices = {
+            planning: tasksData.planning.length > previousTaskCounts.planning
+                ? Array.from({ length: tasksData.planning.length - previousTaskCounts.planning }, (_, i) => previousTaskCounts.planning + i)
+                : [],
+            bellen: tasksData.bellen.length > previousTaskCounts.bellen
+                ? Array.from({ length: tasksData.bellen.length - previousTaskCounts.bellen }, (_, i) => previousTaskCounts.bellen + i)
+                : [],
+            mailen: tasksData.mailen.length > previousTaskCounts.mailen
+                ? Array.from({ length: tasksData.mailen.length - previousTaskCounts.mailen }, (_, i) => previousTaskCounts.mailen + i)
+                : []
+        };
+
         // Clear existing tasks (behalve icon en add button)
         [planningGrid, bellenGrid, mailenGrid].forEach(grid => {
             const cards = grid.querySelectorAll('.task-card:not(.task-card--icon):not(.task-card--add)');
@@ -142,7 +162,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const staticCardsCount = document.querySelectorAll('.page--overzicht .task-card--icon, .page--overzicht .task-card--add').length;
 
         let animationIndex = 0;
-        const animateCard = (card) => {
+        const animateCard = (card, isNew = false) => {
             if (isInitialLoad) {
                 card.classList.add('task-card--loading');
                 // Start na de statische kaarten
@@ -152,6 +172,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     card.classList.remove('task-card--loading');
                     card.classList.add('task-card--loaded');
                 }, delay + 10);
+            } else if (isNew) {
+                // Animatie voor nieuwe taken na initial load
+                card.classList.add('task-card--loading');
+                setTimeout(() => {
+                    card.classList.remove('task-card--loading');
+                    card.classList.add('task-card--loaded');
+                }, 10);
             }
         };
 
@@ -159,7 +186,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const planningAddBtn = planningGrid.querySelector('.task-card--add');
         tasksData.planning.forEach((task, index) => {
             const card = createPlanningCard(task, index);
-            animateCard(card);
+            const isNew = newTaskIndices.planning.includes(index);
+            animateCard(card, isNew);
             planningGrid.insertBefore(card, planningAddBtn);
         });
 
@@ -167,7 +195,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const bellenAddBtn = bellenGrid.querySelector('.task-card--add');
         tasksData.bellen.forEach((task, index) => {
             const card = createContactCard(task, index, 'bellen');
-            animateCard(card);
+            const isNew = newTaskIndices.bellen.includes(index);
+            animateCard(card, isNew);
             bellenGrid.insertBefore(card, bellenAddBtn);
         });
 
@@ -175,9 +204,17 @@ document.addEventListener('DOMContentLoaded', () => {
         const mailenAddBtn = mailenGrid.querySelector('.task-card--add');
         tasksData.mailen.forEach((task, index) => {
             const card = createContactCard(task, index, 'mailen');
-            animateCard(card);
+            const isNew = newTaskIndices.mailen.includes(index);
+            animateCard(card, isNew);
             mailenGrid.insertBefore(card, mailenAddBtn);
         });
+
+        // Update previous counts
+        previousTaskCounts = {
+            planning: tasksData.planning.length,
+            bellen: tasksData.bellen.length,
+            mailen: tasksData.mailen.length
+        };
 
         // Na eerste load, geen animatie meer
         if (isInitialLoad) {

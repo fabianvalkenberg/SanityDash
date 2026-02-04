@@ -1,4 +1,4 @@
-import { initializeApp } from 'firebase/app';
+import { initializeApp, getApps } from 'firebase/app';
 import { getFirestore, doc, getDoc, setDoc } from 'firebase/firestore';
 
 const firebaseConfig = {
@@ -10,7 +10,8 @@ const firebaseConfig = {
     appId: "1:1096864734708:web:6c39d6b6dfb6837da72da1"
 };
 
-const app = initializeApp(firebaseConfig);
+// Initialiseer Firebase alleen als er nog geen app is
+const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
 const db = getFirestore(app);
 
 export default async function handler(req, res) {
