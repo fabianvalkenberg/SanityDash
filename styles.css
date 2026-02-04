@@ -290,6 +290,22 @@ body {
     outline: 1px solid #767676;
 }
 
+/* Ghost preview in target column during drag */
+.task-card-ghost {
+    opacity: 0.4;
+    pointer-events: none;
+}
+
+/* Disable hover state during drag */
+body.is-dragging .task-card::after {
+    opacity: 0 !important;
+    pointer-events: none;
+}
+
+body.is-dragging .task-card:hover::after {
+    opacity: 0 !important;
+}
+
 /* Drop zone voor bewerken */
 .edit-drop-zone {
     position: fixed;

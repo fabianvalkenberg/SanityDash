@@ -525,7 +525,49 @@ document.addEventListener('DOMContentLoaded', () => {
             col.classList.add('drop-target');
         });
 
+        document.body.classList.add('is-dragging');
         document.body.style.userSelect = 'none';
+    }
+
+    let ghostCard = null;
+
+    function createGhostCard(targetCategory) {
+        if (!draggedTaskData) return null;
+
+        const ghost = document.createElement('div');
+        ghost.className = 'task-card task-card-ghost';
+
+        // Converteer data naar target format en maak content
+        if (targetCategory === 'inbox' || targetCategory === 'planning') {
+            ghost.classList.add('task-card--planning');
+            const titel = draggedTaskData.titel || draggedTaskData.naam || 'Taak';
+            ghost.innerHTML = `
+                <div class="task-content">
+                    <span class="task-title">${titel}</span>
+                    ${targetCategory === 'planning' && draggedTaskData.uren ? `<span class="task-hours">${draggedTaskData.uren}</span>` : ''}
+                </div>
+            `;
+        } else {
+            // bellen of mailen
+            ghost.classList.add('task-card--contact');
+            const naam = draggedTaskData.naam || draggedTaskData.titel || 'Contact';
+            const taak = draggedTaskData.taak || '';
+            ghost.innerHTML = `
+                <div class="task-content">
+                    <span class="task-name">${naam}</span>
+                    <span class="task-description">${taak}</span>
+                </div>
+            `;
+        }
+
+        return ghost;
+    }
+
+    function removeGhostCard() {
+        if (ghostCard) {
+            ghostCard.remove();
+            ghostCard = null;
+        }
     }
 
     function positionDropZone() {
@@ -569,15 +611,30 @@ document.addEventListener('DOMContentLoaded', () => {
             editDropZone.classList.remove('drag-over');
         }
 
-        // Highlight hovered column
+        // Highlight hovered column and show ghost preview
         const column = getColumnAtPosition(e.clientX, e.clientY);
         if (column !== hoveredColumn) {
             if (hoveredColumn) {
                 hoveredColumn.classList.remove('column-hover');
             }
+
+            // Remove existing ghost
+            removeGhostCard();
+
             hoveredColumn = column;
             if (hoveredColumn) {
                 hoveredColumn.classList.add('column-hover');
+
+                // Show ghost in target column if it's different from source
+                const targetCategory = hoveredColumn.dataset.category;
+                if (targetCategory && targetCategory !== draggedFromCategory) {
+                    ghostCard = createGhostCard(targetCategory);
+                    if (ghostCard) {
+                        const tasksGrid = hoveredColumn.querySelector('.tasks-grid');
+                        const addButton = tasksGrid.querySelector('.task-card--add');
+                        tasksGrid.insertBefore(ghostCard, addButton);
+                    }
+                }
             }
         }
     }
@@ -596,11 +653,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const targetColumn = getColumnAtPosition(e.clientX, e.clientY);
         const targetCategory = targetColumn ? targetColumn.dataset.category : null;
 
-        // Verwijder column highlights
+        // Verwijder column highlights en ghost
         document.querySelectorAll('.page--overzicht .column').forEach(col => {
             col.classList.remove('drop-target', 'column-hover');
         });
         hoveredColumn = null;
+        removeGhostCard();
 
         if (droppedInEditZone) {
             const column = placeholder.closest('.column');
@@ -619,6 +677,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         editDropZone.classList.remove('visible', 'drag-over');
+        document.body.classList.remove('is-dragging');
         document.body.style.userSelect = '';
     }
 
