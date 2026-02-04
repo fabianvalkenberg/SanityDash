@@ -98,43 +98,11 @@
         .mobile-feedback.success {
             color: var(--color-accent);
         }
-
-        .category-selector {
-            display: flex;
-            gap: 8px;
-            width: 100%;
-        }
-
-        .category-btn {
-            flex: 1;
-            padding: 12px 8px;
-            border: 1px solid #777676;
-            border-radius: 8px;
-            background: transparent;
-            font-family: var(--font-family);
-            font-size: 14px;
-            font-weight: 300;
-            color: #777676;
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
-
-        .category-btn.active {
-            background: var(--color-accent);
-            border-color: var(--color-accent);
-            color: white;
-        }
     </style>
 </head>
 <body>
     <div class="mobile-container">
         <input type="text" class="mobile-input" id="taskInput" placeholder="Nieuwe taak..." autofocus>
-
-        <div class="category-selector">
-            <button class="category-btn active" data-category="planning">Plannen</button>
-            <button class="category-btn" data-category="bellen">Bellen</button>
-            <button class="category-btn" data-category="mailen">Mailen</button>
-        </div>
 
         <div class="mobile-actions">
             <button class="mobile-btn" id="micBtn">
@@ -169,20 +137,9 @@
         const sendBtn = document.getElementById('sendBtn');
         const micBtn = document.getElementById('micBtn');
         const feedback = document.getElementById('feedback');
-        const categoryBtns = document.querySelectorAll('.category-btn');
 
-        let selectedCategory = 'planning';
         let recognition = null;
         let isRecording = false;
-
-        // Category selection
-        categoryBtns.forEach(btn => {
-            btn.addEventListener('click', () => {
-                categoryBtns.forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
-                selectedCategory = btn.dataset.category;
-            });
-        });
 
         // Get tasks from Firebase
         async function getTasks() {
@@ -196,6 +153,7 @@
                 console.error('Error loading tasks:', error);
             }
             return {
+                inbox: [],
                 planning: [],
                 bellen: [],
                 mailen: []
@@ -217,7 +175,7 @@
             }
         }
 
-        // Add task
+        // Add task to inbox
         async function addTask(text) {
             if (!text.trim()) return;
 
@@ -225,29 +183,12 @@
 
             const tasks = await getTasks();
 
-            if (selectedCategory === 'planning') {
-                tasks.planning.push({
-                    titel: text.trim(),
-                    uren: 1,
-                    completed: false
-                });
-            } else {
-                // Voor bellen/mailen, probeer naam en taak te splitsen
-                const parts = text.split(':');
-                if (parts.length > 1) {
-                    tasks[selectedCategory].push({
-                        naam: parts[0].trim(),
-                        taak: parts.slice(1).join(':').trim(),
-                        completed: false
-                    });
-                } else {
-                    tasks[selectedCategory].push({
-                        naam: text.trim(),
-                        taak: '',
-                        completed: false
-                    });
-                }
-            }
+            // Alle taken gaan naar inbox
+            if (!tasks.inbox) tasks.inbox = [];
+            tasks.inbox.push({
+                titel: text.trim(),
+                completed: false
+            });
 
             const success = await saveTasks(tasks);
 

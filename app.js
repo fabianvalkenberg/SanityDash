@@ -25,11 +25,12 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentColumn = null;
     let isNewTask = false;
     let selectedTime = null;
-    let isPlanningMode = false;
 
     // Drag state
     let isDragging = false;
     let draggedCard = null;
+    let draggedTaskData = null;
+    let draggedFromCategory = null;
     let dragStartX = 0;
     let dragStartY = 0;
     let cardOriginalRect = null;
@@ -37,9 +38,11 @@ document.addEventListener('DOMContentLoaded', () => {
     let dragRotation = 0;
     let holdTimeout = null;
     let mouseDownTime = 0;
+    let hoveredColumn = null;
 
     // Taken data (in-memory, synced met Firebase)
     let tasksData = {
+        inbox: [],
         planning: [],
         bellen: [],
         mailen: []
@@ -47,6 +50,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Vorige staat voor detectie van nieuwe taken
     let previousTaskCounts = {
+        inbox: 0,
         planning: 0,
         bellen: 0,
         mailen: 0
@@ -97,9 +101,45 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Subscribe naar taken updates (real-time sync)
         subscribeToTasks((data) => {
+            // Voeg inbox toe als die niet bestaat
+            if (!data.inbox) data.inbox = [];
             tasksData = data;
+
+            // Verwijder taken die langer dan 24 uur geleden zijn afgevinkt
+            cleanupOldCompletedTasks();
+
             renderAllTasks();
         });
+    }
+
+    // ===================
+    // AUTO-CLEANUP COMPLETED TASKS
+    // ===================
+    async function cleanupOldCompletedTasks() {
+        const now = Date.now();
+        const ONE_DAY = 24 * 60 * 60 * 1000;
+        let hasChanges = false;
+
+        ['inbox', 'planning', 'bellen', 'mailen'].forEach(category => {
+            if (!tasksData[category]) return;
+
+            const originalLength = tasksData[category].length;
+            tasksData[category] = tasksData[category].filter(task => {
+                if (task.completed && task.completedAt) {
+                    const completedTime = new Date(task.completedAt).getTime();
+                    return (now - completedTime) < ONE_DAY;
+                }
+                return true;
+            });
+
+            if (tasksData[category].length !== originalLength) {
+                hasChanges = true;
+            }
+        });
+
+        if (hasChanges) {
+            await saveAllTasks();
+        }
     }
 
     let isInitialLoad = true;
@@ -109,13 +149,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (initialAnimationDone) return;
         initialAnimationDone = true;
 
-        // Animeer alle statische kaarten (icon en add buttons)
         const allStaticCards = document.querySelectorAll('.page--overzicht .task-card--icon, .page--overzicht .task-card--add');
         allStaticCards.forEach(card => {
             card.classList.add('task-card--loading');
         });
 
-        // Start animatie met kleine delay
         setTimeout(() => {
             let index = 0;
             allStaticCards.forEach(card => {
@@ -130,42 +168,44 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function renderAllTasks() {
-        const planningGrid = document.querySelector('.page--overzicht .column:nth-child(1) .tasks-grid');
-        const bellenGrid = document.querySelector('.page--overzicht .column:nth-child(2) .tasks-grid');
-        const mailenGrid = document.querySelector('.page--overzicht .column:nth-child(3) .tasks-grid');
+        const inboxGrid = document.querySelector('.page--overzicht .column[data-category="inbox"] .tasks-grid');
+        const planningGrid = document.querySelector('.page--overzicht .column[data-category="planning"] .tasks-grid');
+        const bellenGrid = document.querySelector('.page--overzicht .column[data-category="bellen"] .tasks-grid');
+        const mailenGrid = document.querySelector('.page--overzicht .column[data-category="mailen"] .tasks-grid');
 
         // Detecteer nieuwe taken
         const newTaskIndices = {
-            planning: tasksData.planning.length > previousTaskCounts.planning
+            inbox: tasksData.inbox && tasksData.inbox.length > previousTaskCounts.inbox
+                ? Array.from({ length: tasksData.inbox.length - previousTaskCounts.inbox }, (_, i) => previousTaskCounts.inbox + i)
+                : [],
+            planning: tasksData.planning && tasksData.planning.length > previousTaskCounts.planning
                 ? Array.from({ length: tasksData.planning.length - previousTaskCounts.planning }, (_, i) => previousTaskCounts.planning + i)
                 : [],
-            bellen: tasksData.bellen.length > previousTaskCounts.bellen
+            bellen: tasksData.bellen && tasksData.bellen.length > previousTaskCounts.bellen
                 ? Array.from({ length: tasksData.bellen.length - previousTaskCounts.bellen }, (_, i) => previousTaskCounts.bellen + i)
                 : [],
-            mailen: tasksData.mailen.length > previousTaskCounts.mailen
+            mailen: tasksData.mailen && tasksData.mailen.length > previousTaskCounts.mailen
                 ? Array.from({ length: tasksData.mailen.length - previousTaskCounts.mailen }, (_, i) => previousTaskCounts.mailen + i)
                 : []
         };
 
         // Clear existing tasks (behalve icon en add button)
-        [planningGrid, bellenGrid, mailenGrid].forEach(grid => {
+        [inboxGrid, planningGrid, bellenGrid, mailenGrid].forEach(grid => {
+            if (!grid) return;
             const cards = grid.querySelectorAll('.task-card:not(.task-card--icon):not(.task-card--add)');
             cards.forEach(card => card.remove());
         });
 
-        // Bij eerste load, start met animeren van statische kaarten
         if (isInitialLoad) {
             animateInitialCards();
         }
 
-        // Tel het aantal statische kaarten voor de delay offset
         const staticCardsCount = document.querySelectorAll('.page--overzicht .task-card--icon, .page--overzicht .task-card--add').length;
 
         let animationIndex = 0;
         const animateCard = (card, isNew = false) => {
             if (isInitialLoad) {
                 card.classList.add('task-card--loading');
-                // Start na de statische kaarten
                 const delay = (staticCardsCount + animationIndex) * 50;
                 animationIndex++;
                 setTimeout(() => {
@@ -173,7 +213,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     card.classList.add('task-card--loaded');
                 }, delay + 10);
             } else if (isNew) {
-                // Animatie voor nieuwe taken na initial load
                 card.classList.add('task-card--loading');
                 setTimeout(() => {
                     card.classList.remove('task-card--loading');
@@ -182,44 +221,76 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         };
 
+        // Render inbox taken
+        if (inboxGrid && tasksData.inbox) {
+            const inboxAddBtn = inboxGrid.querySelector('.task-card--add');
+            tasksData.inbox.forEach((task, index) => {
+                const card = createInboxCard(task, index);
+                const isNew = newTaskIndices.inbox.includes(index);
+                animateCard(card, isNew);
+                inboxGrid.insertBefore(card, inboxAddBtn);
+            });
+        }
+
         // Render planning taken
-        const planningAddBtn = planningGrid.querySelector('.task-card--add');
-        tasksData.planning.forEach((task, index) => {
-            const card = createPlanningCard(task, index);
-            const isNew = newTaskIndices.planning.includes(index);
-            animateCard(card, isNew);
-            planningGrid.insertBefore(card, planningAddBtn);
-        });
+        if (planningGrid && tasksData.planning) {
+            const planningAddBtn = planningGrid.querySelector('.task-card--add');
+            tasksData.planning.forEach((task, index) => {
+                const card = createPlanningCard(task, index);
+                const isNew = newTaskIndices.planning.includes(index);
+                animateCard(card, isNew);
+                planningGrid.insertBefore(card, planningAddBtn);
+            });
+        }
 
         // Render bellen taken
-        const bellenAddBtn = bellenGrid.querySelector('.task-card--add');
-        tasksData.bellen.forEach((task, index) => {
-            const card = createContactCard(task, index, 'bellen');
-            const isNew = newTaskIndices.bellen.includes(index);
-            animateCard(card, isNew);
-            bellenGrid.insertBefore(card, bellenAddBtn);
-        });
+        if (bellenGrid && tasksData.bellen) {
+            const bellenAddBtn = bellenGrid.querySelector('.task-card--add');
+            tasksData.bellen.forEach((task, index) => {
+                const card = createContactCard(task, index, 'bellen');
+                const isNew = newTaskIndices.bellen.includes(index);
+                animateCard(card, isNew);
+                bellenGrid.insertBefore(card, bellenAddBtn);
+            });
+        }
 
         // Render mailen taken
-        const mailenAddBtn = mailenGrid.querySelector('.task-card--add');
-        tasksData.mailen.forEach((task, index) => {
-            const card = createContactCard(task, index, 'mailen');
-            const isNew = newTaskIndices.mailen.includes(index);
-            animateCard(card, isNew);
-            mailenGrid.insertBefore(card, mailenAddBtn);
-        });
+        if (mailenGrid && tasksData.mailen) {
+            const mailenAddBtn = mailenGrid.querySelector('.task-card--add');
+            tasksData.mailen.forEach((task, index) => {
+                const card = createContactCard(task, index, 'mailen');
+                const isNew = newTaskIndices.mailen.includes(index);
+                animateCard(card, isNew);
+                mailenGrid.insertBefore(card, mailenAddBtn);
+            });
+        }
 
         // Update previous counts
         previousTaskCounts = {
-            planning: tasksData.planning.length,
-            bellen: tasksData.bellen.length,
-            mailen: tasksData.mailen.length
+            inbox: tasksData.inbox ? tasksData.inbox.length : 0,
+            planning: tasksData.planning ? tasksData.planning.length : 0,
+            bellen: tasksData.bellen ? tasksData.bellen.length : 0,
+            mailen: tasksData.mailen ? tasksData.mailen.length : 0
         };
 
-        // Na eerste load, geen animatie meer
         if (isInitialLoad) {
             setTimeout(() => { isInitialLoad = false; }, 2000);
         }
+    }
+
+    function createInboxCard(task, index) {
+        const card = document.createElement('div');
+        card.className = 'task-card task-card--inbox';
+        if (task.completed) card.classList.add('task-card--completed');
+        card.dataset.index = index;
+        card.dataset.category = 'inbox';
+        card.innerHTML = `
+            <div class="task-content">
+                <span class="task-title">${task.titel}</span>
+            </div>
+        `;
+        attachCardListeners(card);
+        return card;
     }
 
     function createPlanningCard(task, index) {
@@ -308,7 +379,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // Fallback parser als API niet beschikbaar is
     function parseTranscriptFallback(transcript) {
         const result = {
             planning: [],
@@ -366,12 +436,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function addTasksFromTranscript(tasks) {
-        // Voeg completed: false toe aan alle taken
         const addCompleted = (arr) => arr.map(t => ({ ...t, completed: false }));
 
-        tasksData.planning = [...tasksData.planning, ...addCompleted(tasks.planning || [])];
-        tasksData.bellen = [...tasksData.bellen, ...addCompleted(tasks.bellen || [])];
-        tasksData.mailen = [...tasksData.mailen, ...addCompleted(tasks.mailen || [])];
+        tasksData.planning = [...(tasksData.planning || []), ...addCompleted(tasks.planning || [])];
+        tasksData.bellen = [...(tasksData.bellen || []), ...addCompleted(tasks.bellen || [])];
+        tasksData.mailen = [...(tasksData.mailen || []), ...addCompleted(tasks.mailen || [])];
 
         await saveAllTasks();
     }
@@ -383,7 +452,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 const transcript = transcriptInput.value.trim();
                 if (!transcript) return;
 
-                // Toon loading state
                 transcriptInput.disabled = true;
                 transcriptInput.placeholder = 'Analyseren...';
 
@@ -410,6 +478,17 @@ document.addEventListener('DOMContentLoaded', () => {
         return Math.random() * 20 - 12;
     }
 
+    function getColumnAtPosition(x, y) {
+        const columns = document.querySelectorAll('.page--overzicht .column');
+        for (const column of columns) {
+            const rect = column.getBoundingClientRect();
+            if (x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) {
+                return column;
+            }
+        }
+        return null;
+    }
+
     function startDrag(card, e) {
         if (isDragging) return;
 
@@ -417,6 +496,12 @@ document.addEventListener('DOMContentLoaded', () => {
         draggedCard = card;
         cardOriginalRect = card.getBoundingClientRect();
         dragRotation = getRandomRotation();
+
+        // Bewaar task data voor het verplaatsen
+        const category = card.dataset.category;
+        const index = parseInt(card.dataset.index);
+        draggedTaskData = { ...tasksData[category][index] };
+        draggedFromCategory = category;
 
         placeholder = document.createElement('div');
         placeholder.className = 'task-card-placeholder';
@@ -434,6 +519,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
         positionDropZone();
         editDropZone.classList.add('visible');
+
+        // Highlight alle kolommen als mogelijke drop targets
+        document.querySelectorAll('.page--overzicht .column').forEach(col => {
+            col.classList.add('drop-target');
+        });
+
         document.body.style.userSelect = 'none';
     }
 
@@ -466,6 +557,7 @@ document.addEventListener('DOMContentLoaded', () => {
         draggedCard.style.left = (cardOriginalRect.left + deltaX) + 'px';
         draggedCard.style.top = (cardOriginalRect.top + deltaY) + 'px';
 
+        // Check edit drop zone
         const dropRect = editDropZone.getBoundingClientRect();
         const cardCenterX = e.clientX;
         const cardCenterY = e.clientY;
@@ -476,30 +568,98 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
             editDropZone.classList.remove('drag-over');
         }
+
+        // Highlight hovered column
+        const column = getColumnAtPosition(e.clientX, e.clientY);
+        if (column !== hoveredColumn) {
+            if (hoveredColumn) {
+                hoveredColumn.classList.remove('column-hover');
+            }
+            hoveredColumn = column;
+            if (hoveredColumn) {
+                hoveredColumn.classList.add('column-hover');
+            }
+        }
     }
 
-    function endDrag(e) {
+    async function endDrag(e) {
         if (!isDragging || !draggedCard) return;
 
         const dropRect = editDropZone.getBoundingClientRect();
         const cardCenterX = e.clientX;
         const cardCenterY = e.clientY;
 
-        const droppedInZone = cardCenterX >= dropRect.left && cardCenterX <= dropRect.right &&
+        const droppedInEditZone = cardCenterX >= dropRect.left && cardCenterX <= dropRect.right &&
                              cardCenterY >= dropRect.top && cardCenterY <= dropRect.bottom;
 
-        if (droppedInZone) {
+        // Check of we in een andere kolom droppen
+        const targetColumn = getColumnAtPosition(e.clientX, e.clientY);
+        const targetCategory = targetColumn ? targetColumn.dataset.category : null;
+
+        // Verwijder column highlights
+        document.querySelectorAll('.page--overzicht .column').forEach(col => {
+            col.classList.remove('drop-target', 'column-hover');
+        });
+        hoveredColumn = null;
+
+        if (droppedInEditZone) {
             const column = placeholder.closest('.column');
             const cardToEdit = draggedCard;
             resetCardPosition(true);
             draggedCard = null;
+            draggedTaskData = null;
+            draggedFromCategory = null;
             openEditModal(cardToEdit, column, false);
+        } else if (targetCategory && targetCategory !== draggedFromCategory) {
+            // Verplaats taak naar andere kolom
+            await moveTaskToColumn(targetCategory);
+            resetCardPosition(false);
         } else {
             snapBackCard();
         }
 
         editDropZone.classList.remove('visible', 'drag-over');
         document.body.style.userSelect = '';
+    }
+
+    async function moveTaskToColumn(targetCategory) {
+        if (!draggedTaskData || !draggedFromCategory) return;
+
+        const sourceIndex = parseInt(draggedCard.dataset.index);
+
+        // Verwijder uit source
+        tasksData[draggedFromCategory].splice(sourceIndex, 1);
+
+        // Converteer task data naar target format
+        let newTask;
+        if (targetCategory === 'inbox') {
+            newTask = {
+                titel: draggedTaskData.titel || draggedTaskData.naam || 'Taak',
+                completed: false
+            };
+        } else if (targetCategory === 'planning') {
+            newTask = {
+                titel: draggedTaskData.titel || draggedTaskData.naam || 'Taak',
+                uren: draggedTaskData.uren || null,
+                completed: false
+            };
+        } else {
+            // bellen of mailen
+            newTask = {
+                naam: draggedTaskData.naam || draggedTaskData.titel || 'Contact',
+                taak: draggedTaskData.taak || '',
+                completed: false
+            };
+        }
+
+        // Voeg toe aan target
+        if (!tasksData[targetCategory]) tasksData[targetCategory] = [];
+        tasksData[targetCategory].push(newTask);
+
+        draggedTaskData = null;
+        draggedFromCategory = null;
+
+        await saveAllTasks();
     }
 
     function resetCardPosition(keepCardRef = false) {
@@ -519,6 +679,8 @@ document.addEventListener('DOMContentLoaded', () => {
         isDragging = false;
         if (!keepCardRef) {
             draggedCard = null;
+            draggedTaskData = null;
+            draggedFromCategory = null;
         }
         placeholder = null;
     }
@@ -556,6 +718,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
             isDragging = false;
             draggedCard = null;
+            draggedTaskData = null;
+            draggedFromCategory = null;
         }, 350);
     }
 
@@ -567,19 +731,14 @@ document.addEventListener('DOMContentLoaded', () => {
         currentColumn = column;
         isNewTask = isNew;
 
-        isPlanningMode = column.querySelector('.task-card--planning') !== null ||
-                         column.querySelector('.task-card--icon img[alt="Plannen"]') !== null;
+        const category = column.dataset.category;
+        const isPlanningOrInbox = category === 'planning' || category === 'inbox';
 
-        // Check ook op basis van kolom positie
-        const columns = document.querySelectorAll('.page--overzicht .column');
-        const columnIndex = Array.from(columns).indexOf(column);
-        if (columnIndex === 0) isPlanningMode = true;
-
-        if (isPlanningMode) {
+        if (isPlanningOrInbox) {
             editInput.classList.remove('hidden');
             editInput.style.display = '';
             contactFields.classList.add('hidden');
-            timeSelector.classList.remove('hidden');
+            timeSelector.classList.toggle('hidden', category === 'inbox');
         } else {
             editInput.style.display = 'none';
             contactFields.classList.remove('hidden');
@@ -593,13 +752,13 @@ document.addEventListener('DOMContentLoaded', () => {
             selectedTime = null;
             timeBtns.forEach(btn => btn.classList.remove('selected'));
         } else {
-            const category = task.dataset.category;
+            const taskCategory = task.dataset.category;
             const index = parseInt(task.dataset.index);
+            const taskData = tasksData[taskCategory][index];
 
-            if (isPlanningMode) {
-                const taskData = tasksData.planning[index];
-                if (taskData) {
-                    editInput.value = taskData.titel;
+            if (taskData) {
+                if (taskCategory === 'inbox' || taskCategory === 'planning') {
+                    editInput.value = taskData.titel || '';
                     selectedTime = taskData.uren ? String(taskData.uren) : null;
                     timeBtns.forEach(btn => {
                         if (selectedTime && btn.dataset.time === selectedTime) {
@@ -608,12 +767,9 @@ document.addEventListener('DOMContentLoaded', () => {
                             btn.classList.remove('selected');
                         }
                     });
-                }
-            } else {
-                const taskData = tasksData[category][index];
-                if (taskData) {
-                    editContactName.value = taskData.naam;
-                    editContactTask.value = taskData.taak;
+                } else {
+                    editContactName.value = taskData.naam || '';
+                    editContactTask.value = taskData.taak || '';
                 }
             }
         }
@@ -621,7 +777,7 @@ document.addEventListener('DOMContentLoaded', () => {
         editModal.classList.add('active');
 
         setTimeout(() => {
-            if (isPlanningMode) {
+            if (isPlanningOrInbox) {
                 editInput.focus();
             } else {
                 editContactName.focus();
@@ -635,14 +791,12 @@ document.addEventListener('DOMContentLoaded', () => {
         currentColumn = null;
         isNewTask = false;
         selectedTime = null;
-        isPlanningMode = false;
     }
 
     async function saveTask() {
-        const columns = document.querySelectorAll('.page--overzicht .column');
-        const columnIndex = Array.from(columns).indexOf(currentColumn);
+        const category = currentColumn.dataset.category;
 
-        if (isPlanningMode) {
+        if (category === 'inbox' || category === 'planning') {
             const value = editInput.value.trim();
             if (!value) {
                 closeEditModal();
@@ -650,18 +804,25 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             if (isNewTask) {
-                tasksData.planning.push({
+                if (!tasksData[category]) tasksData[category] = [];
+                const newTask = {
                     titel: value,
-                    uren: selectedTime ? parseInt(selectedTime) : null,
                     completed: false
-                });
-            } else {
-                const index = parseInt(currentTask.dataset.index);
-                tasksData.planning[index] = {
-                    ...tasksData.planning[index],
-                    titel: value,
-                    uren: selectedTime ? parseInt(selectedTime) : null
                 };
+                if (category === 'planning') {
+                    newTask.uren = selectedTime ? parseInt(selectedTime) : null;
+                }
+                tasksData[category].push(newTask);
+            } else {
+                const taskCategory = currentTask.dataset.category;
+                const index = parseInt(currentTask.dataset.index);
+                tasksData[taskCategory][index] = {
+                    ...tasksData[taskCategory][index],
+                    titel: value
+                };
+                if (taskCategory === 'planning') {
+                    tasksData[taskCategory][index].uren = selectedTime ? parseInt(selectedTime) : null;
+                }
             }
         } else {
             const name = editContactName.value.trim();
@@ -672,18 +833,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            const category = columnIndex === 1 ? 'bellen' : 'mailen';
-
             if (isNewTask) {
+                if (!tasksData[category]) tasksData[category] = [];
                 tasksData[category].push({
                     naam: name,
                     taak: task,
                     completed: false
                 });
             } else {
+                const taskCategory = currentTask.dataset.category;
                 const index = parseInt(currentTask.dataset.index);
-                tasksData[category][index] = {
-                    ...tasksData[category][index],
+                tasksData[taskCategory][index] = {
+                    ...tasksData[taskCategory][index],
                     naam: name,
                     taak: task
                 };
@@ -717,17 +878,22 @@ document.addEventListener('DOMContentLoaded', () => {
                 const index = parseInt(card.dataset.index);
 
                 if (tasksData[category] && tasksData[category][index]) {
-                    tasksData[category][index].completed = !tasksData[category][index].completed;
+                    const wasCompleted = tasksData[category][index].completed;
+                    tasksData[category][index].completed = !wasCompleted;
 
-                    // Blokkeer hover state tot muis de kaart verlaat
+                    // Sla completedAt op wanneer taak wordt afgevinkt
+                    if (!wasCompleted) {
+                        tasksData[category][index].completedAt = new Date().toISOString();
+                    } else {
+                        delete tasksData[category][index].completedAt;
+                    }
+
                     card.classList.add('hover-blocked');
-
                     await saveAllTasks();
                 }
             }
         });
 
-        // Wanneer muis de kaart verlaat, deblokkeer hover en toon rotate-left voor completed taken
         card.addEventListener('mouseleave', () => {
             card.classList.remove('hover-blocked');
         });

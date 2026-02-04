@@ -29,10 +29,10 @@ export default async function handler(req, res) {
 
     if (req.method === 'GET') {
         task = req.query.task || req.query.t;
-        category = req.query.category || req.query.c || 'planning';
+        category = req.query.category || req.query.c || 'inbox';
     } else if (req.method === 'POST') {
         task = req.body.task || req.body.t;
-        category = req.body.category || req.body.c || 'planning';
+        category = req.body.category || req.body.c || 'inbox';
     } else {
         return res.status(405).json({ error: 'Method not allowed' });
     }
@@ -42,9 +42,9 @@ export default async function handler(req, res) {
     }
 
     // Valideer category
-    const validCategories = ['planning', 'bellen', 'mailen'];
+    const validCategories = ['inbox', 'planning', 'bellen', 'mailen'];
     if (!validCategories.includes(category)) {
-        category = 'planning';
+        category = 'inbox';
     }
 
     try {
@@ -53,6 +53,7 @@ export default async function handler(req, res) {
         const docSnap = await getDoc(docRef);
 
         let tasks = {
+            inbox: [],
             planning: [],
             bellen: [],
             mailen: []
@@ -60,13 +61,19 @@ export default async function handler(req, res) {
 
         if (docSnap.exists()) {
             const data = docSnap.data();
+            tasks.inbox = data.inbox || [];
             tasks.planning = data.planning || [];
             tasks.bellen = data.bellen || [];
             tasks.mailen = data.mailen || [];
         }
 
         // Voeg nieuwe taak toe
-        if (category === 'planning') {
+        if (category === 'inbox') {
+            tasks.inbox.push({
+                titel: task,
+                completed: false
+            });
+        } else if (category === 'planning') {
             tasks.planning.push({
                 titel: task,
                 uren: null,

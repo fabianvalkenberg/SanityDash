@@ -42,13 +42,24 @@
         <!-- OVERZICHT PAGINA -->
         <main class="page page--overzicht active" id="pageOverzicht">
         <div class="columns">
+            <!-- INBOX kolom -->
+            <section class="column" data-category="inbox">
+                <div class="tasks-grid">
+                    <div class="task-card task-card--icon">
+                        <img src="assets/icons/package-alt.svg" alt="Inbox" class="column-icon">
+                    </div>
+                    <div class="task-card task-card--add">
+                        <button class="add-btn"><img src="assets/icons/add.svg" alt="Toevoegen"></button>
+                    </div>
+                </div>
+            </section>
+
             <!-- PLANNEN kolom -->
-            <section class="column">
+            <section class="column" data-category="planning">
                 <div class="tasks-grid">
                     <div class="task-card task-card--icon">
                         <img src="assets/icons/calendar-date.svg" alt="Plannen" class="column-icon">
                     </div>
-                    <!-- Taken worden dynamisch geladen -->
                     <div class="task-card task-card--add">
                         <button class="add-btn"><img src="assets/icons/add.svg" alt="Toevoegen"></button>
                     </div>
@@ -56,12 +67,11 @@
             </section>
 
             <!-- BELLEN kolom -->
-            <section class="column">
+            <section class="column" data-category="bellen">
                 <div class="tasks-grid">
                     <div class="task-card task-card--icon">
                         <img src="assets/icons/call.svg" alt="Bellen" class="column-icon">
                     </div>
-                    <!-- Taken worden dynamisch geladen -->
                     <div class="task-card task-card--add">
                         <button class="add-btn"><img src="assets/icons/add.svg" alt="Toevoegen"></button>
                     </div>
@@ -69,12 +79,11 @@
             </section>
 
             <!-- MAILEN kolom -->
-            <section class="column">
+            <section class="column" data-category="mailen">
                 <div class="tasks-grid">
                     <div class="task-card task-card--icon">
                         <img src="assets/icons/message.svg" alt="Mailen" class="column-icon">
                     </div>
-                    <!-- Taken worden dynamisch geladen -->
                     <div class="task-card task-card--add">
                         <button class="add-btn"><img src="assets/icons/add.svg" alt="Toevoegen"></button>
                     </div>

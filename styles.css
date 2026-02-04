@@ -363,8 +363,63 @@ body {
 
 /* Completed hover: rotate-left icoon in plaats van check */
 .task-card--completed.task-card--planning::after,
-.task-card--completed.task-card--contact::after {
+.task-card--completed.task-card--contact::after,
+.task-card--completed.task-card--inbox::after {
     background-image: url('assets/icons/rotate-left-white.svg');
+}
+
+/* Inbox taakkaartjes */
+.task-card--inbox {
+    cursor: pointer;
+    user-select: none;
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.task-card--inbox::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: var(--color-accent);
+    background-image: url('assets/icons/check-circle-white.svg');
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: 32px 32px;
+    opacity: 0;
+    transition: opacity 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+    pointer-events: none;
+}
+
+.task-card--inbox:hover::after {
+    opacity: 1;
+}
+
+.task-card--inbox .task-content {
+    transition: opacity 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.task-card--inbox:hover .task-content {
+    opacity: 0;
+}
+
+.task-card--inbox .task-title {
+    color: var(--color-dark-gray);
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-normal);
+    line-height: normal;
+}
+
+/* Column drag & drop highlights */
+.column.drop-target {
+    position: relative;
+}
+
+.column.column-hover .tasks-grid {
+    outline: 2px dashed var(--color-accent);
+    outline-offset: -2px;
+    background-color: rgba(248, 96, 45, 0.05);
 }
 
 /* Hover geblokkeerd na klikken - tot muis de kaart verlaat */

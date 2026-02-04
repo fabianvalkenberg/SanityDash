@@ -33,6 +33,7 @@ export async function getTasksFromCloud() {
             return docSnap.data();
         } else {
             return {
+                inbox: [],
                 planning: [],
                 bellen: [],
                 mailen: []
@@ -49,6 +50,7 @@ export async function saveTasksToCloud(tasks) {
     try {
         const docRef = doc(db, 'tasks', TASKS_DOC_ID);
         await setDoc(docRef, {
+            inbox: tasks.inbox || [],
             planning: tasks.planning || [],
             bellen: tasks.bellen || [],
             mailen: tasks.mailen || [],
@@ -87,6 +89,7 @@ export function subscribeToTasks(callback) {
             callback(docSnap.data());
         } else {
             callback({
+                inbox: [],
                 planning: [],
                 bellen: [],
                 mailen: []
