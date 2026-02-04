@@ -39,6 +39,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let holdTimeout = null;
     let mouseDownTime = 0;
     let hoveredColumn = null;
+    let hoverBlockedCard = null; // Onthoudt welke kaart hover-blocked moet blijven na re-render
 
     // Taken data (in-memory, synced met Firebase)
     let tasksData = {
@@ -278,6 +279,15 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    function applyHoverBlockedIfNeeded(card, category, index) {
+        // Als deze kaart net is geklikt, behoud de hover-blocked state
+        if (hoverBlockedCard &&
+            hoverBlockedCard.category === category &&
+            hoverBlockedCard.index === index) {
+            card.classList.add('hover-blocked');
+        }
+    }
+
     function createInboxCard(task, index) {
         const card = document.createElement('div');
         card.className = 'task-card task-card--inbox';
@@ -290,6 +300,7 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>
         `;
         attachCardListeners(card);
+        applyHoverBlockedIfNeeded(card, 'inbox', index);
         return card;
     }
 
@@ -306,6 +317,7 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>
         `;
         attachCardListeners(card);
+        applyHoverBlockedIfNeeded(card, 'planning', index);
         return card;
     }
 
@@ -321,6 +333,7 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>
         `;
         attachCardListeners(card);
+        applyHoverBlockedIfNeeded(card, category, index);
         return card;
     }
 
@@ -947,7 +960,15 @@ document.addEventListener('DOMContentLoaded', () => {
                         delete tasksData[category][index].completedAt;
                     }
 
+                    // Toggle completed class direct (voordat re-render)
+                    card.classList.toggle('task-card--completed', !wasCompleted);
+
+                    // Blokkeer hover tot muis de kaart verlaat
                     card.classList.add('hover-blocked');
+
+                    // Onthoud welke kaart hover-blocked moet blijven na re-render
+                    hoverBlockedCard = { category, index };
+
                     await saveAllTasks();
                 }
             }
@@ -955,6 +976,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
         card.addEventListener('mouseleave', () => {
             card.classList.remove('hover-blocked');
+            // Clear de onthouden hover-blocked state
+            if (hoverBlockedCard &&
+                hoverBlockedCard.category === card.dataset.category &&
+                hoverBlockedCard.index === parseInt(card.dataset.index)) {
+                hoverBlockedCard = null;
+            }
         });
     }
 
