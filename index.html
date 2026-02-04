@@ -5,6 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SanityDash - Todo App</title>
     <link rel="stylesheet" href="styles.css">
+    <script>
+        // Auth check - redirect to login if not authenticated
+        (function() {
+            const token = localStorage.getItem('sanityDashToken');
+            if (!token) {
+                window.location.href = '/login.html';
+            }
+        })();
+    </script>
 </head>
 <body>
     <div class="dashboard">

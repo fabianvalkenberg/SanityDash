@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="SanityDash">
+    <link rel="apple-touch-icon" href="/assets/app-icon/app-icon.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="/assets/app-icon/app-icon.png">
+    <link rel="icon" type="image/png" href="/assets/app-icon/app-icon.png">
+    <title>SanityDash</title>
+    <link rel="stylesheet" href="/styles.css">
+    <style>
+        body {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+        }
+
+        .login-container {
+            width: 100%;
+            max-width: 500px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 64px;
+        }
+
+        .login-logo {
+            width: 80px;
+            height: auto;
+        }
+
+        .login-input {
+            width: 100%;
+            padding: 16px 0;
+            font-family: var(--font-family);
+            font-size: 24px;
+            font-weight: 300;
+            letter-spacing: 8px;
+            color: var(--color-white);
+            background: transparent;
+            border: none;
+            border-bottom: 1px solid #777676;
+            outline: none;
+            text-align: center;
+        }
+
+        .login-input::placeholder {
+            color: transparent;
+        }
+
+        .login-input:focus {
+            border-bottom-color: var(--color-white);
+        }
+
+        .login-error {
+            font-family: var(--font-family);
+            font-size: 14px;
+            font-weight: 300;
+            color: #ff6b6b;
+            text-align: center;
+            min-height: 20px;
+            margin-top: -48px;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <img src="/assets/logo/logo.svg" alt="SanityDash" class="login-logo">
+        <input type="password" class="login-input" id="passwordInput" autofocus>
+        <div class="login-error" id="error"></div>
+    </div>
+
+    <script>
+        const passwordInput = document.getElementById('passwordInput');
+        const error = document.getElementById('error');
+
+        // Check if already logged in
+        const token = localStorage.getItem('sanityDashToken');
+        if (token) {
+            // Verify token is still valid
+            fetch('/api/verify', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ token })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.valid) {
+                    window.location.href = '/';
+                }
+            });
+        }
+
+        passwordInput.addEventListener('keydown', async (e) => {
+            if (e.key === 'Enter') {
+                const password = passwordInput.value;
+                if (!password) return;
+
+                try {
+                    const res = await fetch('/api/login', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ password })
+                    });
+
+                    const data = await res.json();
+
+                    if (data.success) {
+                        localStorage.setItem('sanityDashToken', data.token);
+                        window.location.href = '/';
+                    } else {
+                        error.textContent = 'Verkeerd wachtwoord';
+                        passwordInput.value = '';
+                        passwordInput.focus();
+                    }
+                } catch (err) {
+                    error.textContent = 'Fout bij inloggen';
+                }
+            }
+        });
+
+        // Clear error on typing
+        passwordInput.addEventListener('input', () => {
+            error.textContent = '';
+        });
+    </script>
+</body>
+</html>

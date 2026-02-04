@@ -18,10 +18,22 @@ export default async function handler(req, res) {
     // CORS headers
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
     if (req.method === 'OPTIONS') {
         return res.status(200).end();
+    }
+
+    // Auth check - require API key or valid token
+    const apiKey = process.env.API_KEY;
+    const appPassword = process.env.APP_PASSWORD;
+    const providedKey = req.query.key || req.headers['x-api-key'];
+    const providedToken = req.headers.authorization?.replace('Bearer ', '');
+
+    const expectedToken = appPassword ? Buffer.from(appPassword + '_sanitydash_auth').toString('base64') : null;
+
+    if (providedKey !== apiKey && providedToken !== expectedToken) {
+        return res.status(401).json({ error: 'Unauthorized' });
     }
 
     // Support both GET (Alfred) and POST
