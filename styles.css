@@ -120,7 +120,6 @@ body {
 }
 
 .column {
-    flex: 1;
     max-width: 300px;
 }
 
