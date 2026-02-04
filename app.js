@@ -994,24 +994,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     editConfirm.addEventListener('click', saveTask);
 
-    editInput.addEventListener('keydown', (e) => {
+    // Global Enter/Escape handler for edit modal (works from any element)
+    editModal.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') {
-            saveTask();
-        } else if (e.key === 'Escape') {
-            closeEditModal();
-        }
-    });
-
-    editContactName.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
-            saveTask();
-        } else if (e.key === 'Escape') {
-            closeEditModal();
-        }
-    });
-
-    editContactTask.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
+            e.preventDefault();
             saveTask();
         } else if (e.key === 'Escape') {
             closeEditModal();
