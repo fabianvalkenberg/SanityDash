@@ -17,6 +17,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Invoer elements
     const transcriptInput = document.getElementById('transcriptInput');
+    const invoerLoader = document.getElementById('invoerLoader');
 
     // Profiel elements
     const contactenTextarea = document.getElementById('contactenTextarea');
@@ -460,13 +461,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (transcriptInput) {
         transcriptInput.addEventListener('keydown', async (e) => {
-            if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+            // Enter verstuurt, Shift+Enter voor nieuwe regel
+            if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
                 const transcript = transcriptInput.value.trim();
                 if (!transcript) return;
 
                 transcriptInput.disabled = true;
-                transcriptInput.placeholder = 'Analyseren...';
+                if (invoerLoader) invoerLoader.classList.remove('hidden');
 
                 try {
                     const tasks = await parseTranscriptWithAI(transcript);
@@ -478,7 +480,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     alert('Er ging iets mis bij het verwerken van het transcript.');
                 } finally {
                     transcriptInput.disabled = false;
-                    transcriptInput.placeholder = 'Plak hier je transcript of notities...';
+                    if (invoerLoader) invoerLoader.classList.add('hidden');
                 }
             }
         });

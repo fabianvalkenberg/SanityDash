@@ -698,6 +698,31 @@ body.is-dragging .task-card:hover::after {
     color: #777676;
 }
 
+/* Invoer loader */
+.invoer-loader {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+}
+
+.invoer-loader.hidden {
+    display: none;
+}
+
+.loader-spinner {
+    width: 32px;
+    height: 32px;
+    border: 2px solid #777676;
+    border-top-color: var(--color-accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
 /* Profiel pagina */
 .page--profiel {
     align-items: center;
