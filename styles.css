@@ -36,7 +36,7 @@
     --font-weight-normal: 400;
     --letter-spacing: -0.48px;
 
-    --card-width: 142px;
+    --card-width: 168px;
     --card-padding: 16px;
     --card-gap: 1px;
 }
@@ -182,7 +182,7 @@ body {
 /* Taakkaartjes basis */
 .task-card {
     width: var(--card-width);
-    min-height: 111px;
+    min-height: 130px;
     background-color: var(--color-white);
     display: flex;
     position: relative;
@@ -214,7 +214,7 @@ body {
     display: flex;
     flex-direction: column;
     justify-content: space-between;
-    min-height: 111px;
+    min-height: 130px;
     transition: transform 0.2s ease;
 }
 
@@ -285,7 +285,7 @@ body {
 /* Placeholder waar kaart vandaan komt */
 .task-card-placeholder {
     width: var(--card-width);
-    min-height: 111px;
+    min-height: 130px;
     background-color: rgba(136, 136, 136, 0.3);
     outline: 1px solid #767676;
 }
