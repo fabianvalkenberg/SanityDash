@@ -186,7 +186,7 @@ body {
     display: flex;
     position: relative;
     overflow: hidden;
-    outline: 1px solid #c0c0c0;
+    outline: 1px solid #d8d8d8;
 }
 
 /* Staggered load animatie */
@@ -286,7 +286,7 @@ body {
     width: var(--card-width);
     min-height: 130px;
     background-color: rgba(136, 136, 136, 0.3);
-    outline: 1px solid #c0c0c0;
+    outline: 1px solid #d8d8d8;
 }
 
 /* Ghost preview in target column during drag */
@@ -363,6 +363,7 @@ body.is-dragging .task-card:hover::after {
 /* Afgevinkt state */
 .task-card--completed {
     background-color: #626161;
+    outline-color: #4a4a4a;
 }
 
 
