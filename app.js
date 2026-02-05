@@ -41,6 +41,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let mouseDownTime = 0;
     let hoveredColumn = null;
     let hoverBlockedCard = null; // Onthoudt welke kaart hover-blocked moet blijven na re-render
+    let transitioningCard = null; // Voorkomt re-render tijdens CSS transitie
 
     // Taken data (in-memory, synced met Firebase)
     let tasksData = {
@@ -191,11 +192,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 : []
         };
 
-        // Clear existing tasks (behalve icon en add button)
+        // Clear existing tasks (behalve icon en add button, en kaarten die aan het transitionen zijn)
         [inboxGrid, planningGrid, bellenGrid, mailenGrid].forEach(grid => {
             if (!grid) return;
             const cards = grid.querySelectorAll('.task-card:not(.task-card--icon):not(.task-card--add)');
-            cards.forEach(card => card.remove());
+            cards.forEach(card => {
+                // Skip kaart die aan het transitionen is
+                if (transitioningCard &&
+                    card.dataset.category === transitioningCard.category &&
+                    parseInt(card.dataset.index) === transitioningCard.index) {
+                    return; // Niet verwijderen
+                }
+                card.remove();
+            });
         });
 
         if (isInitialLoad) {
@@ -223,10 +232,18 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         };
 
+        // Helper om te checken of deze kaart aan het transitionen is
+        const isTransitioning = (category, index) => {
+            return transitioningCard &&
+                   transitioningCard.category === category &&
+                   transitioningCard.index === index;
+        };
+
         // Render inbox taken
         if (inboxGrid && tasksData.inbox) {
             const inboxAddBtn = inboxGrid.querySelector('.task-card--add');
             tasksData.inbox.forEach((task, index) => {
+                if (isTransitioning('inbox', index)) return; // Skip, kaart bestaat al
                 const card = createInboxCard(task, index);
                 const isNew = newTaskIndices.inbox.includes(index);
                 animateCard(card, isNew);
@@ -238,6 +255,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (planningGrid && tasksData.planning) {
             const planningAddBtn = planningGrid.querySelector('.task-card--add');
             tasksData.planning.forEach((task, index) => {
+                if (isTransitioning('planning', index)) return; // Skip, kaart bestaat al
                 const card = createPlanningCard(task, index);
                 const isNew = newTaskIndices.planning.includes(index);
                 animateCard(card, isNew);
@@ -249,6 +267,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (bellenGrid && tasksData.bellen) {
             const bellenAddBtn = bellenGrid.querySelector('.task-card--add');
             tasksData.bellen.forEach((task, index) => {
+                if (isTransitioning('bellen', index)) return; // Skip, kaart bestaat al
                 const card = createContactCard(task, index, 'bellen');
                 const isNew = newTaskIndices.bellen.includes(index);
                 animateCard(card, isNew);
@@ -260,6 +279,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (mailenGrid && tasksData.mailen) {
             const mailenAddBtn = mailenGrid.querySelector('.task-card--add');
             tasksData.mailen.forEach((task, index) => {
+                if (isTransitioning('mailen', index)) return; // Skip, kaart bestaat al
                 const card = createContactCard(task, index, 'mailen');
                 const isNew = newTaskIndices.mailen.includes(index);
                 animateCard(card, isNew);
@@ -978,6 +998,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
                     // Onthoud welke kaart hover-blocked moet blijven na re-render
                     hoverBlockedCard = { category, index };
+
+                    // Voorkom re-render tijdens CSS transitie (1.2s)
+                    if (transitioningCard?.timeout) clearTimeout(transitioningCard.timeout);
+                    transitioningCard = {
+                        category,
+                        index,
+                        timeout: setTimeout(() => { transitioningCard = null; }, 1200)
+                    };
 
                     await saveAllTasks();
                 }
