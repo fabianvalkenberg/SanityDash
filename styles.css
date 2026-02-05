@@ -1,24 +1,8 @@
 /* Font-face configuratie */
 @font-face {
-    font-family: 'Zalando Sans';
-    src: url('assets/typography/Zalando_Sans/ZalandoSans-Regular.ttf') format('truetype');
+    font-family: 'Google Sans';
+    src: url('assets/typography/Google_Sans/static/GoogleSans-Regular.ttf') format('truetype');
     font-weight: 400;
-    font-style: normal;
-    font-display: swap;
-}
-
-@font-face {
-    font-family: 'Zalando Sans';
-    src: url('assets/typography/Zalando_Sans/ZalandoSans-Light.ttf') format('truetype');
-    font-weight: 300;
-    font-style: normal;
-    font-display: swap;
-}
-
-@font-face {
-    font-family: 'Zalando Sans';
-    src: url('assets/typography/Zalando_Sans/ZalandoSans-Bold.ttf') format('truetype');
-    font-weight: 700;
     font-style: normal;
     font-display: swap;
 }
@@ -31,7 +15,7 @@
     --color-accent: #F8602D;
     --color-white: #FFFFFF;
 
-    --font-family: 'Zalando Sans', sans-serif;
+    --font-family: 'Google Sans', sans-serif;
     --font-size-base: 15px;
     --font-weight-normal: 400;
     --letter-spacing: -0.48px;
