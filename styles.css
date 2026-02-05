@@ -239,23 +239,25 @@ body {
     background-position: center;
     background-size: 32px 32px;
     opacity: 0;
-    transition: opacity 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: opacity 0.8s cubic-bezier(0.22, 1, 0.36, 1);
     pointer-events: none;
 }
 
 .task-card--planning:hover::after,
 .task-card--contact:hover::after {
     opacity: 1;
+    transition: opacity 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .task-card--planning .task-content,
 .task-card--contact .task-content {
-    transition: opacity 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: opacity 0.8s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .task-card--planning:hover .task-content,
 .task-card--contact:hover .task-content {
     opacity: 0;
+    transition: opacity 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 /* Dragging state */
@@ -404,20 +406,22 @@ body.is-dragging .task-card:hover::after {
     background-position: center;
     background-size: 32px 32px;
     opacity: 0;
-    transition: opacity 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: opacity 0.8s cubic-bezier(0.22, 1, 0.36, 1);
     pointer-events: none;
 }
 
 .task-card--inbox:hover::after {
     opacity: 1;
+    transition: opacity 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .task-card--inbox .task-content {
-    transition: opacity 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: opacity 0.8s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .task-card--inbox:hover .task-content {
     opacity: 0;
+    transition: opacity 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .task-card--inbox .task-title {
