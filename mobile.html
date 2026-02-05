@@ -264,13 +264,20 @@
             recognition.onerror = (event) => {
                 isRecording = false;
                 micBtn.classList.remove('recording');
+                console.log('Speech error:', event.error);
                 // Toon gebruiksvriendelijke foutmelding
                 if (event.error === 'not-allowed') {
                     feedback.textContent = 'Microfoon niet toegestaan';
                 } else if (event.error === 'no-speech') {
                     feedback.textContent = 'Geen spraak gedetecteerd';
+                } else if (event.error === 'aborted') {
+                    feedback.textContent = ''; // Gebruiker stopte, geen foutmelding nodig
+                } else if (event.error === 'network') {
+                    feedback.textContent = 'Netwerkfout';
+                } else if (event.error === 'service-not-allowed') {
+                    feedback.textContent = 'Spraak niet beschikbaar';
                 } else {
-                    feedback.textContent = 'Spraakfout';
+                    feedback.textContent = 'Fout: ' + event.error;
                 }
             };
 
