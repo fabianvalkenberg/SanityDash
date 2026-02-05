@@ -708,14 +708,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Converteer task data naar target format
         let newTask;
+        const fromContactColumn = draggedFromCategory === 'bellen' || draggedFromCategory === 'mailen';
+
         if (targetCategory === 'inbox') {
+            // Bij terugsleepen van bellen/mailen: gebruik taak als titel (niet naam)
             newTask = {
-                titel: draggedTaskData.titel || draggedTaskData.naam || 'Taak',
+                titel: draggedTaskData.titel || (fromContactColumn ? draggedTaskData.taak : null) || 'Taak',
                 completed: false
             };
         } else if (targetCategory === 'planning') {
+            // Bij terugsleepen van bellen/mailen: gebruik taak als titel (niet naam)
             newTask = {
-                titel: draggedTaskData.titel || draggedTaskData.naam || 'Taak',
+                titel: draggedTaskData.titel || (fromContactColumn ? draggedTaskData.taak : null) || 'Taak',
                 uren: draggedTaskData.uren || null,
                 completed: false
             };
