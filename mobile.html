@@ -282,11 +282,12 @@
             };
 
             micBtn.addEventListener('click', () => {
-                taskInput.blur(); // Sluit toetsenbord
                 if (isRecording) {
                     recognition.stop();
                 } else {
+                    // Start recognition EERST, dan pas blur (behoud user gesture context)
                     recognition.start();
+                    taskInput.blur();
                 }
             });
         } else {
