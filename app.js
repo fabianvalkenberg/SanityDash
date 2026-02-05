@@ -565,8 +565,10 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
             // bellen of mailen
             ghost.classList.add('task-card--contact');
-            const naam = draggedTaskData.naam || draggedTaskData.titel || 'Contact';
-            const taak = draggedTaskData.taak || '';
+            // Als bron inbox/planning is, gebruik "..." voor naam (geen titel overnemen)
+            const fromInboxOrPlanning = draggedFromCategory === 'inbox' || draggedFromCategory === 'planning';
+            const naam = fromInboxOrPlanning ? '...' : (draggedTaskData.naam || '...');
+            const taak = draggedTaskData.taak || (fromInboxOrPlanning ? draggedTaskData.titel : '') || '';
             ghost.innerHTML = `
                 <div class="task-content">
                     <span class="task-name">${naam}</span>
@@ -719,9 +721,11 @@ document.addEventListener('DOMContentLoaded', () => {
             };
         } else {
             // bellen of mailen
+            // Als bron inbox/planning is, laat naam leeg met "..." (titel gaat naar taak veld)
+            const fromInboxOrPlanning = draggedFromCategory === 'inbox' || draggedFromCategory === 'planning';
             newTask = {
-                naam: draggedTaskData.naam || draggedTaskData.titel || 'Contact',
-                taak: draggedTaskData.taak || '',
+                naam: fromInboxOrPlanning ? '...' : (draggedTaskData.naam || '...'),
+                taak: draggedTaskData.taak || (fromInboxOrPlanning ? draggedTaskData.titel : '') || '',
                 completed: false
             };
         }

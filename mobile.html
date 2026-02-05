@@ -11,15 +11,6 @@
     <link rel="icon" type="image/png" href="/assets/favicon.png">
     <title>SanityDash</title>
     <link rel="stylesheet" href="/styles.css">
-    <script>
-        // Auth check - redirect to login if not authenticated
-        (function() {
-            const token = localStorage.getItem('sanityDashToken');
-            if (!token) {
-                window.location.href = '/login.html';
-            }
-        })();
-    </script>
     <style>
         body {
             min-height: 100vh;
