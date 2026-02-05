@@ -187,7 +187,7 @@ body {
     position: relative;
     overflow: hidden;
     outline: 1px solid #d8d8d8;
-    transition: background-color 0.8s cubic-bezier(0.22, 1, 0.36, 1), outline-color 0.8s cubic-bezier(0.22, 1, 0.36, 1);
+    transition: background-color 1.2s cubic-bezier(0.22, 1, 0.36, 1), outline-color 1.2s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 /* Staggered load animatie */
@@ -223,7 +223,7 @@ body {
 .task-card--contact {
     cursor: pointer;
     user-select: none;
-    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1), background-color 1.2s cubic-bezier(0.22, 1, 0.36, 1), outline-color 1.2s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .task-card--planning::after,
@@ -240,25 +240,25 @@ body {
     background-position: center;
     background-size: 32px 32px;
     opacity: 0;
-    transition: opacity 0.8s cubic-bezier(0.22, 1, 0.36, 1);
+    transition: opacity 1.2s cubic-bezier(0.22, 1, 0.36, 1);
     pointer-events: none;
 }
 
 .task-card--planning:hover::after,
 .task-card--contact:hover::after {
     opacity: 1;
-    transition: opacity 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+    transition: opacity 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .task-card--planning .task-content,
 .task-card--contact .task-content {
-    transition: opacity 0.8s cubic-bezier(0.22, 1, 0.36, 1);
+    transition: opacity 1.2s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .task-card--planning:hover .task-content,
 .task-card--contact:hover .task-content {
     opacity: 0;
-    transition: opacity 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+    transition: opacity 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 /* Dragging state */
@@ -353,7 +353,7 @@ body.is-dragging .task-card:hover::after {
     font-size: var(--font-size-base);
     font-weight: var(--font-weight-normal);
     line-height: normal;
-    transition: color 0.8s cubic-bezier(0.22, 1, 0.36, 1);
+    transition: color 1.2s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .task-card--planning .subtask-count {
@@ -362,7 +362,7 @@ body.is-dragging .task-card:hover::after {
     background-color: transparent;
     width: fit-content;
     line-height: 1;
-    transition: color 0.8s cubic-bezier(0.22, 1, 0.36, 1);
+    transition: color 1.2s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 /* Afgevinkt state */
@@ -393,7 +393,7 @@ body.is-dragging .task-card:hover::after {
 .task-card--inbox {
     cursor: pointer;
     user-select: none;
-    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1), background-color 1.2s cubic-bezier(0.22, 1, 0.36, 1), outline-color 1.2s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .task-card--inbox::after {
@@ -409,22 +409,22 @@ body.is-dragging .task-card:hover::after {
     background-position: center;
     background-size: 32px 32px;
     opacity: 0;
-    transition: opacity 0.8s cubic-bezier(0.22, 1, 0.36, 1);
+    transition: opacity 1.2s cubic-bezier(0.22, 1, 0.36, 1);
     pointer-events: none;
 }
 
 .task-card--inbox:hover::after {
     opacity: 1;
-    transition: opacity 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+    transition: opacity 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .task-card--inbox .task-content {
-    transition: opacity 0.8s cubic-bezier(0.22, 1, 0.36, 1);
+    transition: opacity 1.2s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .task-card--inbox:hover .task-content {
     opacity: 0;
-    transition: opacity 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+    transition: opacity 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .task-card--inbox .task-title {
@@ -432,7 +432,7 @@ body.is-dragging .task-card:hover::after {
     font-size: var(--font-size-base);
     font-weight: var(--font-weight-normal);
     line-height: normal;
-    transition: color 0.8s cubic-bezier(0.22, 1, 0.36, 1);
+    transition: color 1.2s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 /* Column drag & drop highlights */
@@ -477,13 +477,13 @@ body.is-dragging .task-card:hover::after {
 .task-card--contact .contact-name {
     color: var(--color-accent);
     display: block;
-    transition: color 0.8s cubic-bezier(0.22, 1, 0.36, 1);
+    transition: color 1.2s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .task-card--contact .task-description {
     color: var(--color-dark-gray);
     display: block;
-    transition: color 0.8s cubic-bezier(0.22, 1, 0.36, 1);
+    transition: color 1.2s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 /* Edit Modal */
