@@ -187,6 +187,7 @@ body {
     position: relative;
     overflow: hidden;
     outline: 1px solid #d8d8d8;
+    transition: background-color 0.8s cubic-bezier(0.22, 1, 0.36, 1), outline-color 0.8s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 /* Staggered load animatie */
@@ -352,6 +353,7 @@ body.is-dragging .task-card:hover::after {
     font-size: var(--font-size-base);
     font-weight: var(--font-weight-normal);
     line-height: normal;
+    transition: color 0.8s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .task-card--planning .subtask-count {
@@ -360,6 +362,7 @@ body.is-dragging .task-card:hover::after {
     background-color: transparent;
     width: fit-content;
     line-height: 1;
+    transition: color 0.8s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 /* Afgevinkt state */
@@ -429,6 +432,7 @@ body.is-dragging .task-card:hover::after {
     font-size: var(--font-size-base);
     font-weight: var(--font-weight-normal);
     line-height: normal;
+    transition: color 0.8s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 /* Column drag & drop highlights */
@@ -473,11 +477,13 @@ body.is-dragging .task-card:hover::after {
 .task-card--contact .contact-name {
     color: var(--color-accent);
     display: block;
+    transition: color 0.8s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .task-card--contact .task-description {
     color: var(--color-dark-gray);
     display: block;
+    transition: color 0.8s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 /* Edit Modal */
