@@ -186,7 +186,7 @@ body {
     display: flex;
     position: relative;
     overflow: hidden;
-    outline: 1px solid #767676;
+    outline: 1px solid #c0c0c0;
 }
 
 /* Staggered load animatie */
@@ -286,7 +286,7 @@ body {
     width: var(--card-width);
     min-height: 130px;
     background-color: rgba(136, 136, 136, 0.3);
-    outline: 1px solid #767676;
+    outline: 1px solid #c0c0c0;
 }
 
 /* Ghost preview in target column during drag */
