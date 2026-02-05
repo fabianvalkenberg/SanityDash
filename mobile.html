@@ -222,14 +222,16 @@
             }, 2000);
         }
 
-        // Send button
+        // Send button - blur input first to dismiss keyboard
         sendBtn.addEventListener('click', () => {
+            taskInput.blur();
             addTask(taskInput.value);
         });
 
         // Enter key
         taskInput.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') {
+                taskInput.blur();
                 addTask(taskInput.value);
             }
         });
@@ -262,10 +264,18 @@
             recognition.onerror = (event) => {
                 isRecording = false;
                 micBtn.classList.remove('recording');
-                feedback.textContent = 'Fout: ' + event.error;
+                // Toon gebruiksvriendelijke foutmelding
+                if (event.error === 'not-allowed') {
+                    feedback.textContent = 'Microfoon niet toegestaan';
+                } else if (event.error === 'no-speech') {
+                    feedback.textContent = 'Geen spraak gedetecteerd';
+                } else {
+                    feedback.textContent = 'Spraakfout';
+                }
             };
 
             micBtn.addEventListener('click', () => {
+                taskInput.blur(); // Sluit toetsenbord
                 if (isRecording) {
                     recognition.stop();
                 } else {
