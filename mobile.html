@@ -108,10 +108,20 @@
         .mobile-feedback.success {
             color: var(--color-accent);
         }
+
+        .mobile-logo {
+            position: absolute;
+            top: 60px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 60px;
+            height: auto;
+        }
     </style>
 </head>
 <body>
     <div class="mobile-container">
+        <img src="/assets/logo/logo.svg" alt="SanityDash" class="mobile-logo">
         <div class="mobile-input-area">
             <input type="text" class="mobile-input" id="taskInput" placeholder="" autofocus>
         </div>
