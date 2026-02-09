@@ -216,11 +216,17 @@
         // ===================
         // SLIMME TASK PARSER
         // ===================
+        const STOPWOORDEN = new Set([
+            'om', 'te', 'de', 'het', 'een', 'voor', 'naar', 'aan', 'met', 'over',
+            'van', 'in', 'op', 'bij', 'uit', 'dat', 'die', 'dit', 'dan', 'als',
+            'nog', 'wel', 'niet', 'ook', 'maar', 'want', 'dus', 'even', 'nog',
+            'er', 'ze', 'hij', 'zij', 'we', 'je', 'ik', 'en', 'of', 'is'
+        ]);
+
         function parseTaskInput(text) {
             const input = text.trim();
-            const inputLower = input.toLowerCase();
 
-            // Detecteer actie-keywords (langste eerst zodat "mailen" voor "mail" matcht)
+            // Detecteer actie-keywords (langste eerst)
             const keywordGroups = [
                 { keywords: ['e-mailen', 'emailen', 'mailen', 'e-mail', 'mail'], action: 'mailen' },
                 { keywords: ['opbellen', 'bellen', 'bel'], action: 'bellen' },
@@ -242,7 +248,18 @@
                 if (actionType) break;
             }
 
-            // Detecteer contactnaam (case-insensitive, ook partial match aan begin van woord)
+            // Detecteer uren (bv. "2 uur", "3u", "6 uren")
+            let uren = null;
+            const urenMatch = input.match(/(\d+)\s*(?:uu?r(?:en)?|u)\b/i);
+            if (urenMatch) {
+                const parsedUren = parseInt(urenMatch[1]);
+                if ([1, 2, 3, 6].includes(parsedUren)) {
+                    uren = parsedUren;
+                }
+            }
+
+            // === NAAM DETECTIE ===
+            // Stap 1: Probeer via contactenlijst
             let matchedContact = null;
             for (const contact of contacten) {
                 const escaped = contact.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -253,52 +270,48 @@
                 }
             }
 
-            // Detecteer uren (bv. "2 uur", "3u", "6 uren")
-            let uren = null;
-            const urenMatch = input.match(/(\d+)\s*(?:uu?r(?:en)?|u)\b/i);
-            if (urenMatch) {
-                const parsedUren = parseInt(urenMatch[1]);
-                // Alleen geldige uren: 1, 2, 3, 6
-                if ([1, 2, 3, 6].includes(parsedUren)) {
-                    uren = parsedUren;
+            // Stap 2: Als geen contactmatch maar wel mailen/bellen keyword,
+            // pak het eerste woord dat geen keyword/stopwoord is als naam
+            if (!matchedContact && (actionType === 'mailen' || actionType === 'bellen')) {
+                const woorden = input.split(/\s+/);
+                for (const woord of woorden) {
+                    const woordLower = woord.toLowerCase().replace(/[.,!?]/g, '');
+                    if (woordLower === matchedKeyword.toLowerCase()) continue;
+                    if (STOPWOORDEN.has(woordLower)) continue;
+                    if (/^\d+\s*(?:uu?r(?:en)?|u)$/i.test(woord)) continue;
+                    if (/^\d+$/.test(woord)) continue;
+                    matchedContact = woord.charAt(0).toUpperCase() + woord.slice(1).toLowerCase();
+                    break;
                 }
             }
 
-            // Bouw de taakbeschrijving: verwijder het keyword en de contactnaam uit de tekst
+            // Bouw de taakbeschrijving: verwijder keyword, naam en uren uit de tekst
             let beschrijving = input;
 
-            // Verwijder het actie-keyword (hele woord)
             if (matchedKeyword) {
                 const keywordRegex = new RegExp('(^|\\s|,)' + matchedKeyword + '(\\s|,|\\.|!|$)', 'gi');
                 beschrijving = beschrijving.replace(keywordRegex, '$1');
             }
 
-            // Verwijder de contactnaam (hele woord)
             if (matchedContact) {
                 const escaped = matchedContact.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
                 const contactRegex = new RegExp('(^|\\s|,)' + escaped + '(\\s|,|\\.|!|$)', 'gi');
                 beschrijving = beschrijving.replace(contactRegex, '$1');
             }
 
-            // Verwijder uren-patroon als het naar planning gaat
             if (uren) {
                 beschrijving = beschrijving.replace(/\d+\s*(?:uu?r(?:en)?|u)\b/i, ' ');
             }
 
-            // Verwijder "om", "om te", "voor" verbindingswoorden aan het begin/eind
-            beschrijving = beschrijving.replace(/^\s*(om\s+te|om|voor|naar|aan|met)\s+/i, '');
-
-            // Trim en verwijder dubbele spaties, komma's aan begin/eind
+            beschrijving = beschrijving.replace(/^\s*(om\s+te|om|voor|naar|aan|met|over)\s+/i, '');
             beschrijving = beschrijving.replace(/\s+/g, ' ').replace(/^[\s,]+|[\s,]+$/g, '').trim();
 
-            // Maak eerste letter hoofdletter
             if (beschrijving.length > 0) {
                 beschrijving = beschrijving.charAt(0).toUpperCase() + beschrijving.slice(1);
             }
 
             // === ROUTERING ===
 
-            // Mailen/bellen: als er een contact is gevonden OF als het keyword er was
             if (actionType === 'mailen' || actionType === 'bellen') {
                 return {
                     category: actionType,
@@ -311,9 +324,7 @@
                 };
             }
 
-            // Als er een contact is maar geen actie-keyword: check context
             if (matchedContact && !actionType) {
-                // Standaard naar mailen als er een contact is zonder specifiek keyword
                 return {
                     category: 'mailen',
                     task: {
@@ -325,7 +336,6 @@
                 };
             }
 
-            // Planning: als er uren zijn of het keyword "plannen" werd gebruikt
             if (actionType === 'planning' || uren) {
                 return {
                     category: 'planning',

@@ -17,10 +17,19 @@ const db = getFirestore(app);
 // ===================
 // SLIMME TASK PARSER
 // ===================
+
+// Stopwoorden die nooit een naam zijn
+const STOPWOORDEN = new Set([
+    'om', 'te', 'de', 'het', 'een', 'voor', 'naar', 'aan', 'met', 'over',
+    'van', 'in', 'op', 'bij', 'uit', 'dat', 'die', 'dit', 'dan', 'als',
+    'nog', 'wel', 'niet', 'ook', 'maar', 'want', 'dus', 'even', 'nog',
+    'er', 'ze', 'hij', 'zij', 'we', 'je', 'ik', 'en', 'of', 'is'
+]);
+
 function parseTaskInput(text, contacten) {
     const input = text.trim();
 
-    // Detecteer actie-keywords (langste eerst zodat "mailen" voor "mail" matcht)
+    // Detecteer actie-keywords (langste eerst)
     const keywordGroups = [
         { keywords: ['e-mailen', 'emailen', 'mailen', 'e-mail', 'mail'], action: 'mailen' },
         { keywords: ['opbellen', 'bellen', 'bel'], action: 'bellen' },
@@ -29,28 +38,20 @@ function parseTaskInput(text, contacten) {
 
     let actionType = null;
     let matchedKeyword = null;
+    let keywordIndex = -1;
 
     for (const group of keywordGroups) {
         for (const kw of group.keywords) {
             const regex = new RegExp('(^|\\s|,)' + kw + '(\\s|,|\\.|!|$)', 'i');
-            if (regex.test(input)) {
+            const match = regex.exec(input);
+            if (match) {
                 actionType = group.action;
                 matchedKeyword = kw;
+                keywordIndex = match.index + match[1].length;
                 break;
             }
         }
         if (actionType) break;
-    }
-
-    // Detecteer contactnaam (case-insensitive)
-    let matchedContact = null;
-    for (const contact of contacten) {
-        const escaped = contact.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        const regex = new RegExp('(^|\\s|,)' + escaped + '(\\s|,|\\.|!|$)', 'i');
-        if (regex.test(input)) {
-            matchedContact = contact;
-            break;
-        }
     }
 
     // Detecteer uren (bv. "2 uur", "3u", "6 uren")
@@ -63,16 +64,47 @@ function parseTaskInput(text, contacten) {
         }
     }
 
-    // Bouw de taakbeschrijving: verwijder het keyword en de contactnaam uit de tekst
+    // === NAAM DETECTIE ===
+    // Stap 1: Probeer via contactenlijst (als beschikbaar)
+    let matchedContact = null;
+    for (const contact of contacten) {
+        const escaped = contact.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const regex = new RegExp('(^|\\s|,)' + escaped + '(\\s|,|\\.|!|$)', 'i');
+        if (regex.test(input)) {
+            matchedContact = contact;
+            break;
+        }
+    }
+
+    // Stap 2: Als geen contactmatch maar wel een mailen/bellen keyword,
+    // pak het eerste woord dat geen keyword/stopwoord is als naam
+    if (!matchedContact && (actionType === 'mailen' || actionType === 'bellen')) {
+        const woorden = input.split(/\s+/);
+        for (const woord of woorden) {
+            const woordLower = woord.toLowerCase().replace(/[.,!?]/g, '');
+            // Sla over als het het keyword zelf is
+            if (woordLower === matchedKeyword.toLowerCase()) continue;
+            // Sla over als het een stopwoord is
+            if (STOPWOORDEN.has(woordLower)) continue;
+            // Sla over als het een uren-patroon is
+            if (/^\d+\s*(?:uu?r(?:en)?|u)$/i.test(woord)) continue;
+            if (/^\d+$/.test(woord)) continue;
+            // Dit is waarschijnlijk de naam — eerste letter hoofdletter
+            matchedContact = woord.charAt(0).toUpperCase() + woord.slice(1).toLowerCase();
+            break;
+        }
+    }
+
+    // Bouw de taakbeschrijving: verwijder keyword, naam en uren uit de tekst
     let beschrijving = input;
 
-    // Verwijder het actie-keyword (hele woord)
+    // Verwijder het actie-keyword
     if (matchedKeyword) {
         const keywordRegex = new RegExp('(^|\\s|,)' + matchedKeyword + '(\\s|,|\\.|!|$)', 'gi');
         beschrijving = beschrijving.replace(keywordRegex, '$1');
     }
 
-    // Verwijder de contactnaam (hele woord)
+    // Verwijder de contactnaam
     if (matchedContact) {
         const escaped = matchedContact.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         const contactRegex = new RegExp('(^|\\s|,)' + escaped + '(\\s|,|\\.|!|$)', 'gi');
@@ -85,7 +117,7 @@ function parseTaskInput(text, contacten) {
     }
 
     // Verwijder verbindingswoorden aan het begin
-    beschrijving = beschrijving.replace(/^\s*(om\s+te|om|voor|naar|aan|met)\s+/i, '');
+    beschrijving = beschrijving.replace(/^\s*(om\s+te|om|voor|naar|aan|met|over)\s+/i, '');
 
     // Trim en verwijder dubbele spaties, komma's aan begin/eind
     beschrijving = beschrijving.replace(/\s+/g, ' ').replace(/^[\s,]+|[\s,]+$/g, '').trim();
@@ -110,7 +142,7 @@ function parseTaskInput(text, contacten) {
         };
     }
 
-    // Contact zonder actie-keyword → standaard mailen
+    // Contact gevonden zonder actie-keyword → standaard mailen
     if (matchedContact && !actionType) {
         return {
             category: 'mailen',
@@ -157,12 +189,11 @@ export default async function handler(req, res) {
         return res.status(200).end();
     }
 
-    // Auth check - require API key or valid token
+    // Auth check
     const apiKey = process.env.API_KEY;
     const appPassword = process.env.APP_PASSWORD;
     const providedKey = req.query.key || req.headers['x-api-key'];
     const providedToken = req.headers.authorization?.replace('Bearer ', '');
-
     const expectedToken = appPassword ? Buffer.from(appPassword + '_sanitydash_auth').toString('base64') : null;
 
     if (providedKey !== apiKey && providedToken !== expectedToken) {
@@ -185,7 +216,7 @@ export default async function handler(req, res) {
     }
 
     try {
-        // Laad contacten uit Firebase
+        // Probeer contacten te laden (als fallback, parser werkt ook zonder)
         let contacten = [];
         try {
             const contactsRef = doc(db, 'settings', 'contacts');
@@ -194,7 +225,7 @@ export default async function handler(req, res) {
                 contacten = contactsSnap.data().contacten || [];
             }
         } catch (e) {
-            console.error('Error loading contacts:', e);
+            // Geen probleem — parser kan ook zonder contacten namen herkennen
         }
 
         // Parse de input met slimme routing
@@ -219,7 +250,7 @@ export default async function handler(req, res) {
             tasks.mailen = data.mailen || [];
         }
 
-        // Voeg de geparsede taak toe aan de juiste categorie
+        // Voeg de geparsede taak toe
         if (!tasks[parsed.category]) tasks[parsed.category] = [];
         tasks[parsed.category].push(parsed.task);
 
@@ -233,8 +264,7 @@ export default async function handler(req, res) {
             success: true,
             message: `${parsed.label} +`,
             category: parsed.category,
-            task: parsed.task,
-            debug: { contactenCount: contacten.length, contacten: contacten.slice(0, 5) }
+            task: parsed.task
         });
 
     } catch (error) {
