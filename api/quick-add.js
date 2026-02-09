@@ -54,13 +54,23 @@ function parseTaskInput(text, contacten) {
         if (actionType) break;
     }
 
-    // Detecteer uren (bv. "2 uur", "3u", "6 uren")
+    // Detecteer uren (bv. "2 uur", "3u", "6 uren", of los getal aan het eind: "taak 3")
     let uren = null;
     const urenMatch = input.match(/(\d+)\s*(?:uu?r(?:en)?|u)\b/i);
     if (urenMatch) {
         const parsedUren = parseInt(urenMatch[1]);
         if ([1, 2, 3, 6].includes(parsedUren)) {
             uren = parsedUren;
+        }
+    }
+    // Los getal aan het eind van de zin (bv. "plannen taak 3")
+    if (!uren) {
+        const trailingNumber = input.match(/\s(\d+)\s*$/);
+        if (trailingNumber) {
+            const parsedUren = parseInt(trailingNumber[1]);
+            if ([1, 2, 3, 6].includes(parsedUren)) {
+                uren = parsedUren;
+            }
         }
     }
 
@@ -111,9 +121,10 @@ function parseTaskInput(text, contacten) {
         beschrijving = beschrijving.replace(contactRegex, '$1');
     }
 
-    // Verwijder uren-patroon
+    // Verwijder uren-patroon (inclusief los getal aan het eind)
     if (uren) {
         beschrijving = beschrijving.replace(/\d+\s*(?:uu?r(?:en)?|u)\b/i, ' ');
+        beschrijving = beschrijving.replace(/\s\d+\s*$/, '');
     }
 
     // Verwijder verbindingswoorden aan het begin
