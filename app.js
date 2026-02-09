@@ -588,23 +588,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function positionDropZone() {
-        const allCards = document.querySelectorAll('.page--overzicht .task-card:not(.dragging)');
-        let lowestBottom = 0;
-
-        allCards.forEach(card => {
-            const rect = card.getBoundingClientRect();
-            if (rect.bottom > lowestBottom) {
-                lowestBottom = rect.bottom;
-            }
-        });
-
-        const topPosition = lowestBottom + 32;
-        const bottomPadding = 32;
-        const availableHeight = window.innerHeight - topPosition - bottomPadding;
-
-        editDropZone.style.top = topPosition + 'px';
-        editDropZone.style.bottom = 'auto';
-        editDropZone.style.height = Math.max(100, availableHeight) + 'px';
+        // Drop zone is nu fixed links via CSS, geen dynamische positionering nodig
     }
 
     function updateDrag(e) {
