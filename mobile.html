@@ -220,52 +220,33 @@
             const input = text.trim();
             const inputLower = input.toLowerCase();
 
-            // Detecteer actie-keywords
-            const mailKeywords = ['mailen', 'mail', 'e-mail', 'e-mailen', 'emailen'];
-            const belKeywords = ['bellen', 'bel', 'opbellen'];
-            const planKeywords = ['plannen', 'plan', 'inplannen'];
+            // Detecteer actie-keywords (langste eerst zodat "mailen" voor "mail" matcht)
+            const keywordGroups = [
+                { keywords: ['e-mailen', 'emailen', 'mailen', 'e-mail', 'mail'], action: 'mailen' },
+                { keywords: ['opbellen', 'bellen', 'bel'], action: 'bellen' },
+                { keywords: ['inplannen', 'plannen', 'plan'], action: 'planning' }
+            ];
 
             let actionType = null;
             let matchedKeyword = null;
 
-            // Check mailen keywords
-            for (const kw of mailKeywords) {
-                if (inputLower.includes(kw)) {
-                    actionType = 'mailen';
-                    matchedKeyword = kw;
-                    break;
-                }
-            }
-
-            // Check bellen keywords (alleen als nog geen match)
-            if (!actionType) {
-                for (const kw of belKeywords) {
-                    // Gebruik woordgrens-check zodat "bellen" niet "bestellen" matcht
-                    const regex = new RegExp('(^|\\s|,)' + kw + '($|\\s|,|\\.|!)', 'i');
+            for (const group of keywordGroups) {
+                for (const kw of group.keywords) {
+                    const regex = new RegExp('(^|\\s|,)' + kw + '(\\s|,|\\.|!|$)', 'i');
                     if (regex.test(input)) {
-                        actionType = 'bellen';
+                        actionType = group.action;
                         matchedKeyword = kw;
                         break;
                     }
                 }
+                if (actionType) break;
             }
 
-            // Check planning keywords
-            if (!actionType) {
-                for (const kw of planKeywords) {
-                    const regex = new RegExp('(^|\\s|,)' + kw + '($|\\s|,|\\.|!)', 'i');
-                    if (regex.test(input)) {
-                        actionType = 'planning';
-                        matchedKeyword = kw;
-                        break;
-                    }
-                }
-            }
-
-            // Detecteer contactnaam (case-insensitive)
+            // Detecteer contactnaam (case-insensitive, ook partial match aan begin van woord)
             let matchedContact = null;
             for (const contact of contacten) {
-                const regex = new RegExp('(^|\\s|,)' + contact.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '($|\\s|,|\\.|!)', 'i');
+                const escaped = contact.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                const regex = new RegExp('(^|\\s|,)' + escaped + '(\\s|,|\\.|!|$)', 'i');
                 if (regex.test(input)) {
                     matchedContact = contact;
                     break;
@@ -286,16 +267,17 @@
             // Bouw de taakbeschrijving: verwijder het keyword en de contactnaam uit de tekst
             let beschrijving = input;
 
-            // Verwijder het actie-keyword
+            // Verwijder het actie-keyword (hele woord)
             if (matchedKeyword) {
-                const keywordRegex = new RegExp('\\s*' + matchedKeyword + '\\s*', 'gi');
-                beschrijving = beschrijving.replace(keywordRegex, ' ');
+                const keywordRegex = new RegExp('(^|\\s|,)' + matchedKeyword + '(\\s|,|\\.|!|$)', 'gi');
+                beschrijving = beschrijving.replace(keywordRegex, '$1');
             }
 
-            // Verwijder de contactnaam
+            // Verwijder de contactnaam (hele woord)
             if (matchedContact) {
-                const contactRegex = new RegExp('\\s*' + matchedContact.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*', 'gi');
-                beschrijving = beschrijving.replace(contactRegex, ' ');
+                const escaped = matchedContact.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                const contactRegex = new RegExp('(^|\\s|,)' + escaped + '(\\s|,|\\.|!|$)', 'gi');
+                beschrijving = beschrijving.replace(contactRegex, '$1');
             }
 
             // Verwijder uren-patroon als het naar planning gaat
@@ -372,6 +354,11 @@
             if (!text.trim()) return;
 
             feedback.textContent = 'Opslaan...';
+
+            // Zorg dat contacten geladen zijn
+            if (contacten.length === 0) {
+                await loadContacts();
+            }
 
             const tasks = await getTasks();
             const parsed = parseTaskInput(text);
