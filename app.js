@@ -678,27 +678,16 @@ document.addEventListener('DOMContentLoaded', () => {
         removeGhostCard();
 
         if (droppedInEditZone) {
-            // Sleep naar beneden = afvinken/herstellen
+            // Sleep naar beneden = direct verwijderen
             const category = draggedFromCategory;
             const index = parseInt(draggedCard.dataset.index);
 
             if (tasksData[category] && tasksData[category][index]) {
-                const wasCompleted = tasksData[category][index].completed;
-                tasksData[category][index].completed = !wasCompleted;
-
-                if (!wasCompleted) {
-                    tasksData[category][index].completedAt = new Date().toISOString();
-                } else {
-                    delete tasksData[category][index].completedAt;
-                }
+                tasksData[category].splice(index, 1);
             }
 
             resetCardPosition(false);
-
-            // Wacht tot CSS transitie klaar is voordat we opslaan
-            setTimeout(async () => {
-                await saveAllTasks();
-            }, 1200);
+            await saveAllTasks();
         } else if (targetCategory && targetCategory !== draggedFromCategory) {
             // Verplaats taak naar andere kolom
             await moveTaskToColumn(targetCategory);

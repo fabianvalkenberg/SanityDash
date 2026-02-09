@@ -162,6 +162,22 @@
 
         let recognition = null;
         let isRecording = false;
+        let contacten = [];
+
+        // Laad contacten bij opstarten
+        async function loadContacts() {
+            try {
+                const docRef = doc(db, 'settings', 'contacts');
+                const docSnap = await getDoc(docRef);
+                if (docSnap.exists()) {
+                    contacten = docSnap.data().contacten || [];
+                }
+            } catch (error) {
+                console.error('Error loading contacts:', error);
+            }
+        }
+
+        loadContacts();
 
         // Get tasks from Firebase
         async function getTasks() {
@@ -197,27 +213,178 @@
             }
         }
 
-        // Add task to inbox
+        // ===================
+        // SLIMME TASK PARSER
+        // ===================
+        function parseTaskInput(text) {
+            const input = text.trim();
+            const inputLower = input.toLowerCase();
+
+            // Detecteer actie-keywords
+            const mailKeywords = ['mailen', 'mail', 'e-mail', 'e-mailen', 'emailen'];
+            const belKeywords = ['bellen', 'bel', 'opbellen'];
+            const planKeywords = ['plannen', 'plan', 'inplannen'];
+
+            let actionType = null;
+            let matchedKeyword = null;
+
+            // Check mailen keywords
+            for (const kw of mailKeywords) {
+                if (inputLower.includes(kw)) {
+                    actionType = 'mailen';
+                    matchedKeyword = kw;
+                    break;
+                }
+            }
+
+            // Check bellen keywords (alleen als nog geen match)
+            if (!actionType) {
+                for (const kw of belKeywords) {
+                    // Gebruik woordgrens-check zodat "bellen" niet "bestellen" matcht
+                    const regex = new RegExp('(^|\\s|,)' + kw + '($|\\s|,|\\.|!)', 'i');
+                    if (regex.test(input)) {
+                        actionType = 'bellen';
+                        matchedKeyword = kw;
+                        break;
+                    }
+                }
+            }
+
+            // Check planning keywords
+            if (!actionType) {
+                for (const kw of planKeywords) {
+                    const regex = new RegExp('(^|\\s|,)' + kw + '($|\\s|,|\\.|!)', 'i');
+                    if (regex.test(input)) {
+                        actionType = 'planning';
+                        matchedKeyword = kw;
+                        break;
+                    }
+                }
+            }
+
+            // Detecteer contactnaam (case-insensitive)
+            let matchedContact = null;
+            for (const contact of contacten) {
+                const regex = new RegExp('(^|\\s|,)' + contact.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '($|\\s|,|\\.|!)', 'i');
+                if (regex.test(input)) {
+                    matchedContact = contact;
+                    break;
+                }
+            }
+
+            // Detecteer uren (bv. "2 uur", "3u", "6 uren")
+            let uren = null;
+            const urenMatch = input.match(/(\d+)\s*(?:uu?r(?:en)?|u)\b/i);
+            if (urenMatch) {
+                const parsedUren = parseInt(urenMatch[1]);
+                // Alleen geldige uren: 1, 2, 3, 6
+                if ([1, 2, 3, 6].includes(parsedUren)) {
+                    uren = parsedUren;
+                }
+            }
+
+            // Bouw de taakbeschrijving: verwijder het keyword en de contactnaam uit de tekst
+            let beschrijving = input;
+
+            // Verwijder het actie-keyword
+            if (matchedKeyword) {
+                const keywordRegex = new RegExp('\\s*' + matchedKeyword + '\\s*', 'gi');
+                beschrijving = beschrijving.replace(keywordRegex, ' ');
+            }
+
+            // Verwijder de contactnaam
+            if (matchedContact) {
+                const contactRegex = new RegExp('\\s*' + matchedContact.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*', 'gi');
+                beschrijving = beschrijving.replace(contactRegex, ' ');
+            }
+
+            // Verwijder uren-patroon als het naar planning gaat
+            if (uren) {
+                beschrijving = beschrijving.replace(/\d+\s*(?:uu?r(?:en)?|u)\b/i, ' ');
+            }
+
+            // Verwijder "om", "om te", "voor" verbindingswoorden aan het begin/eind
+            beschrijving = beschrijving.replace(/^\s*(om\s+te|om|voor|naar|aan|met)\s+/i, '');
+
+            // Trim en verwijder dubbele spaties, komma's aan begin/eind
+            beschrijving = beschrijving.replace(/\s+/g, ' ').replace(/^[\s,]+|[\s,]+$/g, '').trim();
+
+            // Maak eerste letter hoofdletter
+            if (beschrijving.length > 0) {
+                beschrijving = beschrijving.charAt(0).toUpperCase() + beschrijving.slice(1);
+            }
+
+            // === ROUTERING ===
+
+            // Mailen/bellen: als er een contact is gevonden OF als het keyword er was
+            if (actionType === 'mailen' || actionType === 'bellen') {
+                return {
+                    category: actionType,
+                    task: {
+                        naam: matchedContact || '...',
+                        taak: beschrijving || 'Taak',
+                        completed: false
+                    },
+                    label: actionType === 'mailen' ? 'Mailen' : 'Bellen'
+                };
+            }
+
+            // Als er een contact is maar geen actie-keyword: check context
+            if (matchedContact && !actionType) {
+                // Standaard naar mailen als er een contact is zonder specifiek keyword
+                return {
+                    category: 'mailen',
+                    task: {
+                        naam: matchedContact,
+                        taak: beschrijving || 'Taak',
+                        completed: false
+                    },
+                    label: 'Mailen'
+                };
+            }
+
+            // Planning: als er uren zijn of het keyword "plannen" werd gebruikt
+            if (actionType === 'planning' || uren) {
+                return {
+                    category: 'planning',
+                    task: {
+                        titel: beschrijving || input,
+                        uren: uren,
+                        completed: false
+                    },
+                    label: 'Planning' + (uren ? ` (${uren}u)` : '')
+                };
+            }
+
+            // Fallback: inbox
+            return {
+                category: 'inbox',
+                task: {
+                    titel: input,
+                    completed: false
+                },
+                label: 'Inbox'
+            };
+        }
+
+        // Add task met slimme routing
         async function addTask(text) {
             if (!text.trim()) return;
 
             feedback.textContent = 'Opslaan...';
 
             const tasks = await getTasks();
+            const parsed = parseTaskInput(text);
 
-            // Alle taken gaan naar inbox
-            if (!tasks.inbox) tasks.inbox = [];
-            tasks.inbox.push({
-                titel: text.trim(),
-                completed: false
-            });
+            if (!tasks[parsed.category]) tasks[parsed.category] = [];
+            tasks[parsed.category].push(parsed.task);
 
             const success = await saveTasks(tasks);
 
             taskInput.value = '';
 
             if (success) {
-                showFeedback('Taak toegevoegd!');
+                showFeedback(parsed.label + ' +');
             } else {
                 showFeedback('Fout bij opslaan');
             }
@@ -275,13 +442,12 @@
                 isRecording = false;
                 micBtn.classList.remove('recording');
                 console.log('Speech error:', event.error);
-                // Toon gebruiksvriendelijke foutmelding
                 if (event.error === 'not-allowed') {
                     feedback.textContent = 'Microfoon niet toegestaan';
                 } else if (event.error === 'no-speech') {
                     feedback.textContent = 'Geen spraak gedetecteerd';
                 } else if (event.error === 'aborted') {
-                    feedback.textContent = ''; // Gebruiker stopte, geen foutmelding nodig
+                    feedback.textContent = '';
                 } else if (event.error === 'network') {
                     feedback.textContent = 'Netwerkfout';
                 } else if (event.error === 'service-not-allowed') {
@@ -295,7 +461,6 @@
                 if (isRecording) {
                     recognition.stop();
                 } else {
-                    // Start recognition EERST, dan pas blur (behoud user gesture context)
                     recognition.start();
                     taskInput.blur();
                 }
