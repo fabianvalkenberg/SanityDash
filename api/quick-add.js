@@ -233,7 +233,8 @@ export default async function handler(req, res) {
             success: true,
             message: `${parsed.label} +`,
             category: parsed.category,
-            task: parsed.task
+            task: parsed.task,
+            debug: { contactenCount: contacten.length, contacten: contacten.slice(0, 5) }
         });
 
     } catch (error) {
