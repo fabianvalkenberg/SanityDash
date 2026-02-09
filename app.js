@@ -678,13 +678,27 @@ document.addEventListener('DOMContentLoaded', () => {
         removeGhostCard();
 
         if (droppedInEditZone) {
-            const column = placeholder.closest('.column');
-            const cardToEdit = draggedCard;
-            resetCardPosition(true);
-            draggedCard = null;
-            draggedTaskData = null;
-            draggedFromCategory = null;
-            openEditModal(cardToEdit, column, false);
+            // Sleep naar beneden = afvinken/herstellen
+            const category = draggedFromCategory;
+            const index = parseInt(draggedCard.dataset.index);
+
+            if (tasksData[category] && tasksData[category][index]) {
+                const wasCompleted = tasksData[category][index].completed;
+                tasksData[category][index].completed = !wasCompleted;
+
+                if (!wasCompleted) {
+                    tasksData[category][index].completedAt = new Date().toISOString();
+                } else {
+                    delete tasksData[category][index].completedAt;
+                }
+            }
+
+            resetCardPosition(false);
+
+            // Wacht tot CSS transitie klaar is voordat we opslaan
+            setTimeout(async () => {
+                await saveAllTasks();
+            }, 1200);
         } else if (targetCategory && targetCategory !== draggedFromCategory) {
             // Verplaats taak naar andere kolom
             await moveTaskToColumn(targetCategory);
@@ -861,8 +875,10 @@ document.addEventListener('DOMContentLoaded', () => {
         setTimeout(() => {
             if (isPlanningOrInbox) {
                 editInput.focus();
+                editInput.select();
             } else {
                 editContactName.focus();
+                editContactName.select();
             }
         }, 300);
     }
@@ -954,36 +970,11 @@ document.addEventListener('DOMContentLoaded', () => {
             }, 100);
         });
 
-        card.addEventListener('click', async (e) => {
+        card.addEventListener('click', (e) => {
             if (!isDragging && Date.now() - mouseDownTime < 250) {
-                const category = card.dataset.category;
-                const index = parseInt(card.dataset.index);
-
-                if (tasksData[category] && tasksData[category][index]) {
-                    const wasCompleted = tasksData[category][index].completed;
-                    tasksData[category][index].completed = !wasCompleted;
-
-                    // Sla completedAt op wanneer taak wordt afgevinkt
-                    if (!wasCompleted) {
-                        tasksData[category][index].completedAt = new Date().toISOString();
-                    } else {
-                        delete tasksData[category][index].completedAt;
-                    }
-
-                    // Toggle completed class direct (voordat re-render)
-                    card.classList.toggle('task-card--completed', !wasCompleted);
-
-                    // Blokkeer hover tot muis de kaart verlaat
-                    card.classList.add('hover-blocked');
-
-                    // Onthoud welke kaart hover-blocked moet blijven na re-render
-                    hoverBlockedCard = { category, index };
-
-                    // Wacht tot CSS transitie klaar is voordat we opslaan (voorkomt re-render tijdens animatie)
-                    setTimeout(async () => {
-                        await saveAllTasks();
-                    }, 1200);
-                }
+                // Klik opent edit modal
+                const column = card.closest('.column');
+                openEditModal(card, column, false);
             }
         });
 
@@ -1046,7 +1037,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     editModal.addEventListener('click', (e) => {
         if (e.target === editModal) {
-            closeEditModal();
+            saveTask();
         }
     });
 

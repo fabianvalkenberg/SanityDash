@@ -219,7 +219,7 @@ body {
     width: 100%;
     height: 100%;
     background-color: var(--color-accent);
-    background-image: url('assets/icons/check-circle-white.svg');
+    background-image: url('assets/icons/edit-white.svg');
     background-repeat: no-repeat;
     background-position: center;
     background-size: 32px 32px;
@@ -366,11 +366,11 @@ body.is-dragging .task-card:hover::after {
     color: #444444 !important;
 }
 
-/* Completed hover: rotate-left icoon in plaats van check */
+/* Completed hover: edit icoon (zelfde als niet-completed, want klik = bewerken) */
 .task-card--completed.task-card--planning::after,
 .task-card--completed.task-card--contact::after,
 .task-card--completed.task-card--inbox::after {
-    background-image: url('assets/icons/rotate-left-white.svg');
+    background-image: url('assets/icons/edit-white.svg');
 }
 
 /* Inbox taakkaartjes */
@@ -388,7 +388,7 @@ body.is-dragging .task-card:hover::after {
     width: 100%;
     height: 100%;
     background-color: var(--color-accent);
-    background-image: url('assets/icons/check-circle-white.svg');
+    background-image: url('assets/icons/edit-white.svg');
     background-repeat: no-repeat;
     background-position: center;
     background-size: 32px 32px;
