@@ -21,7 +21,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const invoerLoader = document.getElementById('invoerLoader');
 
     // Profiel elements
-    const contactenTextarea = document.getElementById('contactenTextarea');
+    const contactInput = document.getElementById('contactInput');
+    const contactenList = document.getElementById('contactenList');
 
     let currentTask = null;
     let currentColumn = null;
@@ -361,24 +362,43 @@ document.addEventListener('DOMContentLoaded', () => {
     // ===================
     // PROFIEL MANAGEMENT
     // ===================
+    function renderContactenList() {
+        if (!contactenList) return;
+        contactenList.innerHTML = '';
+
+        contacten.forEach((naam, index) => {
+            const item = document.createElement('div');
+            item.className = 'profiel-contact';
+            item.innerHTML = `
+                <span class="profiel-contact-name">${naam}</span>
+                <button class="profiel-contact-delete" data-index="${index}">
+                    <img src="assets/icons/close.svg" alt="Verwijder">
+                </button>
+            `;
+            item.querySelector('.profiel-contact-delete').addEventListener('click', async () => {
+                contacten.splice(index, 1);
+                await saveContactsToCloud(contacten);
+                renderContactenList();
+            });
+            contactenList.appendChild(item);
+        });
+    }
+
     function loadContactenToTextarea() {
-        if (contactenTextarea) {
-            contactenTextarea.value = contacten.join(', ');
-        }
+        renderContactenList();
     }
 
-    async function saveContactenFromTextarea() {
-        if (contactenTextarea) {
-            const text = contactenTextarea.value;
-            contacten = text.split(',')
-                .map(name => name.trim())
-                .filter(name => name.length > 0);
-            await saveContactsToCloud(contacten);
-        }
-    }
-
-    if (contactenTextarea) {
-        contactenTextarea.addEventListener('blur', saveContactenFromTextarea);
+    if (contactInput) {
+        contactInput.addEventListener('keydown', async (e) => {
+            if (e.key === 'Enter') {
+                const naam = contactInput.value.trim();
+                if (!naam) return;
+                contacten.push(naam);
+                await saveContactsToCloud(contacten);
+                renderContactenList();
+                contactInput.value = '';
+            }
+        });
     }
 
     // ===================
@@ -1383,11 +1403,30 @@ document.addEventListener('DOMContentLoaded', () => {
     // COLUMN SUMMARIES
     // ===================
     function updateColumnSummaries() {
-        updateSummary('bellen', 'bellenSummary', 'Bellen');
-        updateSummary('mailen', 'mailenSummary', 'Mailen');
+        updatePlanningSummary();
+        updateContactSummary('bellen', 'bellenSummary');
+        updateContactSummary('mailen', 'mailenSummary');
     }
 
-    function updateSummary(category, summaryId, label) {
+    function updatePlanningSummary() {
+        const summary = document.getElementById('planningSummary');
+        if (!summary) return;
+
+        const tasks = tasksData.planning ? tasksData.planning.filter(t => !t.completed) : [];
+        const count = tasks.length;
+
+        if (count === 0) {
+            summary.classList.remove('visible');
+            return;
+        }
+
+        const totalMinutes = tasks.reduce((sum, t) => sum + (t.uren || 0), 0);
+        const timeStr = totalMinutes >= 60 ? formatMinutes(totalMinutes) : totalMinutes + ' min';
+        summary.querySelector('.summary-text').textContent = `${count} to do's — ${timeStr}`;
+        summary.classList.add('visible');
+    }
+
+    function updateContactSummary(category, summaryId) {
         const summary = document.getElementById(summaryId);
         if (!summary) return;
 
@@ -1400,7 +1439,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         const minutes = count * 5;
-        summary.querySelector('.summary-text').textContent = `${count} items — ~${minutes} min`;
+        summary.querySelector('.summary-text').textContent = `${count} to do's — ${minutes} min`;
         summary.classList.add('visible');
     }
 

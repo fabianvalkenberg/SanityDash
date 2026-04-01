@@ -53,7 +53,10 @@
         <!-- PROFIEL PAGINA -->
         <main class="page page--profiel" id="pageProfiel">
             <div class="profiel-container">
-                <textarea class="profiel-textarea" id="contactenTextarea" placeholder="Voer hier alle namen in, gescheiden door een komma..."></textarea>
+                <div class="profiel-add">
+                    <input type="text" class="profiel-input" id="contactInput" placeholder="Naam toevoegen...">
+                </div>
+                <div class="profiel-list" id="contactenList"></div>
             </div>
         </main>
 
@@ -105,6 +108,9 @@
                     <div class="task-card task-card--add">
                         <button class="add-btn"><img src="assets/icons/add.svg" alt="Toevoegen"></button>
                     </div>
+                </div>
+                <div class="column-summary" id="planningSummary">
+                    <span class="summary-text"></span>
                 </div>
             </section>
 
