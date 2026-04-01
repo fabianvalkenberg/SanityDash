@@ -4,6 +4,6 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "firebase": "^10.8.0"
+    "firebase": "^10.14.1"
   }
 }

@@ -9,6 +9,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const timeSelector = document.getElementById('timeSelector');
     const timeBtns = document.querySelectorAll('.time-btn');
     const editConfirm = document.getElementById('editConfirm');
+    const editDelete = document.getElementById('editDelete');
     const editDropZone = document.getElementById('editDropZone');
 
     // Page elements
@@ -26,6 +27,27 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentColumn = null;
     let isNewTask = false;
     let selectedTime = null;
+
+    // Utility: minuten formatteren voor weergave
+    function formatMinutes(min) {
+        if (!min) return '.';
+        if (min >= 60) return (min / 60) + 'u';
+        return min + 'm';
+    }
+
+    // Migratie: oude uren (1,2,3,6) naar minuten (60,120,180,360)
+    function migrateUrenToMinutes(data) {
+        let migrated = false;
+        if (data.planning) {
+            data.planning.forEach(task => {
+                if (task.uren && task.uren <= 6) {
+                    task.uren = task.uren * 60;
+                    migrated = true;
+                }
+            });
+        }
+        return migrated;
+    }
 
     // Drag state
     let isDragging = false;
@@ -52,7 +74,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Vorige staat voor detectie van nieuwe taken
     let previousTaskCounts = {
-        inbox: 0,
         planning: 0,
         bellen: 0,
         mailen: 0
@@ -105,6 +126,12 @@ document.addEventListener('DOMContentLoaded', () => {
         subscribeToTasks((data) => {
             // Voeg inbox toe als die niet bestaat
             if (!data.inbox) data.inbox = [];
+
+            // Migreer oude uren-waarden naar minuten (eenmalig)
+            if (migrateUrenToMinutes(data)) {
+                saveTasksToCloud(data);
+            }
+
             tasksData = data;
 
             // Verwijder taken die langer dan 24 uur geleden zijn afgevinkt
@@ -170,16 +197,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function renderAllTasks() {
-        const inboxGrid = document.querySelector('.page--overzicht .column[data-category="inbox"] .tasks-grid');
         const planningGrid = document.querySelector('.page--overzicht .column[data-category="planning"] .tasks-grid');
         const bellenGrid = document.querySelector('.page--overzicht .column[data-category="bellen"] .tasks-grid');
         const mailenGrid = document.querySelector('.page--overzicht .column[data-category="mailen"] .tasks-grid');
 
         // Detecteer nieuwe taken
         const newTaskIndices = {
-            inbox: tasksData.inbox && tasksData.inbox.length > previousTaskCounts.inbox
-                ? Array.from({ length: tasksData.inbox.length - previousTaskCounts.inbox }, (_, i) => previousTaskCounts.inbox + i)
-                : [],
             planning: tasksData.planning && tasksData.planning.length > previousTaskCounts.planning
                 ? Array.from({ length: tasksData.planning.length - previousTaskCounts.planning }, (_, i) => previousTaskCounts.planning + i)
                 : [],
@@ -192,7 +215,7 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         // Clear existing tasks (behalve icon en add button)
-        [inboxGrid, planningGrid, bellenGrid, mailenGrid].forEach(grid => {
+        [planningGrid, bellenGrid, mailenGrid].forEach(grid => {
             if (!grid) return;
             const cards = grid.querySelectorAll('.task-card:not(.task-card--icon):not(.task-card--add)');
             cards.forEach(card => card.remove());
@@ -222,17 +245,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 }, 10);
             }
         };
-
-        // Render inbox taken
-        if (inboxGrid && tasksData.inbox) {
-            const inboxAddBtn = inboxGrid.querySelector('.task-card--add');
-            tasksData.inbox.forEach((task, index) => {
-                const card = createInboxCard(task, index);
-                const isNew = newTaskIndices.inbox.includes(index);
-                animateCard(card, isNew);
-                inboxGrid.insertBefore(card, inboxAddBtn);
-            });
-        }
 
         // Render planning taken
         if (planningGrid && tasksData.planning) {
@@ -269,11 +281,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Update previous counts
         previousTaskCounts = {
-            inbox: tasksData.inbox ? tasksData.inbox.length : 0,
             planning: tasksData.planning ? tasksData.planning.length : 0,
             bellen: tasksData.bellen ? tasksData.bellen.length : 0,
             mailen: tasksData.mailen ? tasksData.mailen.length : 0
         };
+
+        // Render triage pagina
+        renderTriagePage();
+        updateTriageBadge();
+        updateColumnSummaries();
 
         if (isInitialLoad) {
             setTimeout(() => { isInitialLoad = false; }, 2000);
@@ -314,7 +330,7 @@ document.addEventListener('DOMContentLoaded', () => {
         card.innerHTML = `
             <div class="task-content">
                 <span class="task-title">${task.titel}</span>
-                <span class="subtask-count">${task.uren || '.'}</span>
+                <span class="subtask-count">${formatMinutes(task.uren)}</span>
             </div>
         `;
         attachCardListeners(card);
@@ -843,6 +859,9 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
+        // Hide delete button for new tasks, show for existing
+        editDelete.style.display = isNew ? 'none' : '';
+
         editModal.classList.add('active');
 
         setTimeout(() => {
@@ -998,6 +1017,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
     editConfirm.addEventListener('click', saveTask);
 
+    editDelete.addEventListener('click', async () => {
+        if (!currentTask || isNewTask) return;
+        const category = currentTask.dataset.category;
+        const index = parseInt(currentTask.dataset.index);
+        if (tasksData[category] && tasksData[category][index] !== undefined) {
+            tasksData[category].splice(index, 1);
+            await saveAllTasks();
+        }
+        closeEditModal();
+    });
+
     // Global Enter/Escape handler for edit modal (works from any element)
     editModal.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') {
@@ -1021,6 +1051,398 @@ document.addEventListener('DOMContentLoaded', () => {
             openEditModal(null, column, true);
         });
     });
+
+    // ===================
+    // TRIAGE SYSTEEM
+    // ===================
+    let triageIsDragging = false;
+    let triageDraggedItem = null;
+    let triageDraggedIndex = null;
+    let triageDragStartX = 0;
+    let triageDragStartY = 0;
+    let triageItemOriginalRect = null;
+    let triagePlaceholder = null;
+    let triageHoveredZone = null;
+    let triageHoldTimeout = null;
+    let triageInlineEditActive = false;
+
+    function renderTriagePage() {
+        if (triageInlineEditActive) return;
+        const list = document.getElementById('triageInboxList');
+        if (!list) return;
+
+        // Verwijder alleen inbox items, bewaar icon kaartje
+        const existingItems = list.querySelectorAll('.triage-inbox-item, .triage-inbox-empty');
+        existingItems.forEach(item => item.remove());
+
+        if (!tasksData.inbox || tasksData.inbox.length === 0) {
+            const empty = document.createElement('div');
+            empty.className = 'triage-inbox-empty';
+            empty.textContent = 'Inbox is leeg';
+            list.appendChild(empty);
+            return;
+        }
+
+        tasksData.inbox.forEach((task, index) => {
+            const item = document.createElement('div');
+            item.className = 'triage-inbox-item';
+            item.dataset.index = index;
+            item.innerHTML = `
+                <div class="task-content">
+                    <span class="task-title">${task.titel}</span>
+                </div>
+            `;
+            attachTriageDragListeners(item);
+            list.appendChild(item);
+        });
+    }
+
+    function updateTriageBadge() {
+        const badge = document.getElementById('triageBadge');
+        if (!badge) return;
+        const count = tasksData.inbox ? tasksData.inbox.length : 0;
+        if (count > 0) {
+            badge.textContent = count;
+            badge.classList.add('visible');
+        } else {
+            badge.classList.remove('visible');
+        }
+    }
+
+    // Triage drag listeners
+    function attachTriageDragListeners(item) {
+        item.addEventListener('mousedown', (e) => {
+            if (e.button !== 0) return;
+            e.preventDefault();
+
+            triageDragStartX = e.clientX;
+            triageDragStartY = e.clientY;
+
+            const capturedItem = item;
+            triageHoldTimeout = setTimeout(() => {
+                startTriageDrag(capturedItem, e);
+            }, 100);
+        });
+    }
+
+    function startTriageDrag(item, e) {
+        if (triageIsDragging) return;
+
+        triageIsDragging = true;
+        triageDraggedItem = item;
+        triageDraggedIndex = parseInt(item.dataset.index);
+        triageItemOriginalRect = item.getBoundingClientRect();
+
+        // Placeholder
+        triagePlaceholder = document.createElement('div');
+        triagePlaceholder.className = 'triage-inbox-placeholder';
+        item.parentNode.insertBefore(triagePlaceholder, item);
+
+        // Maak item fixed
+        item.classList.add('dragging');
+        item.style.width = triageItemOriginalRect.width + 'px';
+        item.style.height = triageItemOriginalRect.height + 'px';
+        item.style.left = triageItemOriginalRect.left + 'px';
+        item.style.top = triageItemOriginalRect.top + 'px';
+
+        document.body.classList.add('is-triage-dragging');
+        document.body.style.userSelect = 'none';
+    }
+
+    function getTriageZoneAtPosition(x, y) {
+        const zones = document.querySelectorAll('.triage-zone-list');
+        for (const zone of zones) {
+            const rect = zone.getBoundingClientRect();
+            if (x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) {
+                return zone;
+            }
+        }
+        return null;
+    }
+
+    function updateTriageDrag(e) {
+        if (!triageIsDragging || !triageDraggedItem) return;
+
+        const deltaX = e.clientX - triageDragStartX;
+        const deltaY = e.clientY - triageDragStartY;
+
+        triageDraggedItem.style.left = (triageItemOriginalRect.left + deltaX) + 'px';
+        triageDraggedItem.style.top = (triageItemOriginalRect.top + deltaY) + 'px';
+
+        // Zone hover detectie
+        const zone = getTriageZoneAtPosition(e.clientX, e.clientY);
+        if (zone !== triageHoveredZone) {
+            if (triageHoveredZone) triageHoveredZone.classList.remove('zone-hover');
+            triageHoveredZone = zone;
+            if (triageHoveredZone) triageHoveredZone.classList.add('zone-hover');
+        }
+    }
+
+    async function endTriageDrag(e) {
+        if (!triageIsDragging || !triageDraggedItem) return;
+
+        const zone = getTriageZoneAtPosition(e.clientX, e.clientY);
+        const targetZone = zone ? zone.closest('.triage-zone') : null;
+        const zoneName = targetZone ? targetZone.dataset.zone : null;
+
+        // Cleanup hover
+        if (triageHoveredZone) {
+            triageHoveredZone.classList.remove('zone-hover');
+            triageHoveredZone = null;
+        }
+
+        if (zoneName && tasksData.inbox && tasksData.inbox[triageDraggedIndex]) {
+            const task = { ...tasksData.inbox[triageDraggedIndex] };
+            tasksData.inbox.splice(triageDraggedIndex, 1);
+
+            // Reset drag state
+            resetTriageDrag();
+            await saveAllTasks();
+
+            // Toon inline editor
+            const zoneList = targetZone.querySelector('.triage-zone-list');
+            if (zoneName === 'planning') {
+                showTriageTimePicker(task, zoneList);
+            } else {
+                showTriageNameField(task, zoneList, zoneName);
+            }
+        } else {
+            // Snap back
+            resetTriageDrag();
+        }
+    }
+
+    function resetTriageDrag() {
+        if (triageDraggedItem) {
+            triageDraggedItem.classList.remove('dragging');
+            triageDraggedItem.style.width = '';
+            triageDraggedItem.style.height = '';
+            triageDraggedItem.style.left = '';
+            triageDraggedItem.style.top = '';
+        }
+        if (triagePlaceholder && triagePlaceholder.parentNode) {
+            triagePlaceholder.parentNode.removeChild(triagePlaceholder);
+        }
+
+        triageIsDragging = false;
+        triageDraggedItem = null;
+        triageDraggedIndex = null;
+        triagePlaceholder = null;
+        document.body.classList.remove('is-triage-dragging');
+        document.body.style.userSelect = '';
+    }
+
+    // Wire triage drag into global listeners
+    document.addEventListener('mousemove', (e) => {
+        if (triageIsDragging) updateTriageDrag(e);
+    });
+
+    document.addEventListener('mouseup', (e) => {
+        if (triageHoldTimeout) {
+            clearTimeout(triageHoldTimeout);
+            triageHoldTimeout = null;
+        }
+        if (triageIsDragging) endTriageDrag(e);
+    });
+
+    // ===================
+    // INLINE EDITING
+    // ===================
+    function showTriageTimePicker(task, zoneList) {
+        triageInlineEditActive = true;
+
+        // Wrapper: kaartje + zwevende knoppen
+        const wrapper = document.createElement('div');
+        wrapper.className = 'triage-inline-wrapper';
+
+        // Het kaartje zelf (zelfde stijl als inbox kaartje)
+        const card = document.createElement('div');
+        card.className = 'triage-zone-item triage-inline-card';
+        card.innerHTML = `<span class="task-title">${task.titel}</span>`;
+
+        // Zwevende knoppen ernaast
+        const actions = document.createElement('div');
+        actions.className = 'triage-float-actions';
+        actions.innerHTML = `
+            <button class="triage-time-btn" data-min="15">15m</button>
+            <button class="triage-time-btn" data-min="30">30m</button>
+            <button class="triage-time-btn" data-min="60">1u</button>
+            <button class="triage-time-btn" data-min="120">2u</button>
+        `;
+
+        wrapper.appendChild(card);
+        wrapper.appendChild(actions);
+
+        actions.querySelectorAll('.triage-time-btn').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const minutes = parseInt(btn.dataset.min);
+                if (!tasksData.planning) tasksData.planning = [];
+                tasksData.planning.push({
+                    titel: task.titel,
+                    uren: minutes,
+                    completed: false
+                });
+                wrapper.remove();
+                triageInlineEditActive = false;
+                await saveAllTasks();
+            });
+        });
+
+        zoneList.appendChild(wrapper);
+    }
+
+    function detectContactName(titel) {
+        if (!contacten || contacten.length === 0) return null;
+        const lowerTitel = titel.toLowerCase();
+        for (const contact of contacten) {
+            if (lowerTitel.includes(contact.toLowerCase())) {
+                // Verwijder de naam uit de titel voor de taakbeschrijving
+                const regex = new RegExp(contact.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+                let taak = titel.replace(regex, '').replace(/^\s*[,:\-–]\s*/, '').replace(/\s*[,:\-–]\s*$/, '').trim();
+                if (!taak) taak = titel;
+                return { naam: contact, taak };
+            }
+        }
+        return null;
+    }
+
+    function showTriageNameField(task, zoneList, category) {
+        // Check eerst of er al een naam in zit
+        const detected = detectContactName(task.titel);
+
+        if (detected) {
+            // Naam gevonden — direct opslaan
+            if (!tasksData[category]) tasksData[category] = [];
+            tasksData[category].push({
+                naam: detected.naam,
+                taak: detected.taak,
+                completed: false
+            });
+            saveAllTasks();
+            return;
+        }
+
+        // Geen naam — toon kaartje met zwevend invoerveld
+        triageInlineEditActive = true;
+
+        const wrapper = document.createElement('div');
+        wrapper.className = 'triage-inline-wrapper';
+
+        // Het kaartje zelf
+        const card = document.createElement('div');
+        card.className = 'triage-zone-item triage-inline-card';
+        card.innerHTML = `<span class="task-title">${task.titel}</span>`;
+
+        // Zwevend invoerveld ernaast
+        const actions = document.createElement('div');
+        actions.className = 'triage-float-actions';
+        actions.innerHTML = `<input type="text" class="triage-inline-name" placeholder="Wie?">`;
+
+        wrapper.appendChild(card);
+        wrapper.appendChild(actions);
+
+        const nameInput = actions.querySelector('.triage-inline-name');
+
+        const confirmName = async () => {
+            const naam = nameInput.value.trim() || '...';
+            if (!tasksData[category]) tasksData[category] = [];
+            tasksData[category].push({
+                naam: naam,
+                taak: task.titel,
+                completed: false
+            });
+            wrapper.remove();
+            triageInlineEditActive = false;
+            await saveAllTasks();
+        };
+
+        nameInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                confirmName();
+            } else if (e.key === 'Escape') {
+                if (!tasksData.inbox) tasksData.inbox = [];
+                tasksData.inbox.push(task);
+                wrapper.remove();
+                triageInlineEditActive = false;
+                saveAllTasks();
+            }
+        });
+
+        nameInput.addEventListener('blur', () => {
+            setTimeout(() => {
+                if (wrapper.parentNode) confirmName();
+            }, 100);
+        });
+
+        zoneList.appendChild(wrapper);
+        setTimeout(() => nameInput.focus(), 50);
+    }
+
+    // ===================
+    // COLUMN SUMMARIES
+    // ===================
+    function updateColumnSummaries() {
+        updateSummary('bellen', 'bellenSummary', 'Bellen');
+        updateSummary('mailen', 'mailenSummary', 'Mailen');
+    }
+
+    function updateSummary(category, summaryId, label) {
+        const summary = document.getElementById(summaryId);
+        if (!summary) return;
+
+        const tasks = tasksData[category] ? tasksData[category].filter(t => !t.completed) : [];
+        const count = tasks.length;
+
+        if (count === 0) {
+            summary.classList.remove('visible');
+            return;
+        }
+
+        const minutes = count * 5;
+        summary.querySelector('.summary-text').textContent = `${count} items — ~${minutes} min`;
+        summary.classList.add('visible');
+    }
+
+    // Copy handlers voor summaries
+    document.querySelectorAll('.summary-copy-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const column = btn.closest('.column');
+            const category = column.dataset.category;
+            const label = category === 'bellen' ? 'Bellen' : 'Mailen';
+            const tasks = tasksData[category] ? tasksData[category].filter(t => !t.completed) : [];
+            const minutes = tasks.length * 5;
+
+            let text = `${label} (${minutes} min)\n`;
+            tasks.forEach(t => {
+                text += `- ${t.naam}: ${t.taak}\n`;
+            });
+            text = text.trim();
+
+            // Clipboard met fallback voor non-HTTPS
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(text).catch(() => {
+                    fallbackCopy(text);
+                });
+            } else {
+                fallbackCopy(text);
+            }
+
+            btn.classList.add('copied');
+            setTimeout(() => btn.classList.remove('copied'), 1500);
+        });
+    });
+
+    function fallbackCopy(text) {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+    }
 
     // Initialize Firebase data
     initializeData();
