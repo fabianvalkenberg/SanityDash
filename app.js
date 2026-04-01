@@ -1145,6 +1145,8 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    let triageDragRotation = 0;
+
     function startTriageDrag(item, e) {
         if (triageIsDragging) return;
 
@@ -1152,6 +1154,7 @@ document.addEventListener('DOMContentLoaded', () => {
         triageDraggedItem = item;
         triageDraggedIndex = parseInt(item.dataset.index);
         triageItemOriginalRect = item.getBoundingClientRect();
+        triageDragRotation = getRandomRotation();
 
         // Placeholder
         triagePlaceholder = document.createElement('div');
@@ -1164,6 +1167,11 @@ document.addEventListener('DOMContentLoaded', () => {
         item.style.height = triageItemOriginalRect.height + 'px';
         item.style.left = triageItemOriginalRect.left + 'px';
         item.style.top = triageItemOriginalRect.top + 'px';
+
+        // Start animatie naar rotatie
+        item.style.transform = 'scale(1) rotate(0deg)';
+        item.offsetHeight;
+        item.style.transform = `scale(1.05) rotate(${triageDragRotation}deg)`;
 
         document.body.classList.add('is-triage-dragging');
         document.body.style.userSelect = 'none';
@@ -1239,6 +1247,7 @@ document.addEventListener('DOMContentLoaded', () => {
             triageDraggedItem.style.height = '';
             triageDraggedItem.style.left = '';
             triageDraggedItem.style.top = '';
+            triageDraggedItem.style.transform = '';
         }
         if (triagePlaceholder && triagePlaceholder.parentNode) {
             triagePlaceholder.parentNode.removeChild(triagePlaceholder);
