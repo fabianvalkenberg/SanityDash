@@ -1072,6 +1072,15 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
+    // Triage add button — hergebruik edit modal met fake column element
+    const triageAddBtn = document.getElementById('triageAddBtn');
+    if (triageAddBtn) {
+        triageAddBtn.addEventListener('click', () => {
+            const fakeColumn = { dataset: { category: 'inbox' } };
+            openEditModal(null, fakeColumn, true);
+        });
+    }
+
     // ===================
     // TRIAGE SYSTEEM
     // ===================
@@ -1091,15 +1100,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const list = document.getElementById('triageInboxList');
         if (!list) return;
 
-        // Verwijder alleen inbox items, bewaar icon kaartje
+        // Verwijder alleen inbox items, bewaar icon kaartje en add button
         const existingItems = list.querySelectorAll('.triage-inbox-item, .triage-inbox-empty');
         existingItems.forEach(item => item.remove());
 
+        const addBtn = list.querySelector('.triage-add');
+
         if (!tasksData.inbox || tasksData.inbox.length === 0) {
-            const empty = document.createElement('div');
-            empty.className = 'triage-inbox-empty';
-            empty.textContent = 'Inbox is leeg';
-            list.appendChild(empty);
             return;
         }
 
@@ -1113,7 +1120,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>
             `;
             attachTriageDragListeners(item);
-            list.appendChild(item);
+            list.insertBefore(item, addBtn);
         });
     }
 
