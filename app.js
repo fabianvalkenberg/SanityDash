@@ -1173,6 +1173,9 @@ document.addEventListener('DOMContentLoaded', () => {
         item.offsetHeight;
         item.style.transform = `scale(1.05) rotate(${triageDragRotation}deg)`;
 
+        // Toon delete zone (links)
+        editDropZone.classList.add('visible');
+
         document.body.classList.add('is-triage-dragging');
         document.body.style.userSelect = 'none';
     }
@@ -1197,6 +1200,15 @@ document.addEventListener('DOMContentLoaded', () => {
         triageDraggedItem.style.left = (triageItemOriginalRect.left + deltaX) + 'px';
         triageDraggedItem.style.top = (triageItemOriginalRect.top + deltaY) + 'px';
 
+        // Delete zone hover
+        const dropRect = editDropZone.getBoundingClientRect();
+        if (e.clientX >= dropRect.left && e.clientX <= dropRect.right &&
+            e.clientY >= dropRect.top && e.clientY <= dropRect.bottom) {
+            editDropZone.classList.add('drag-over');
+        } else {
+            editDropZone.classList.remove('drag-over');
+        }
+
         // Zone hover detectie
         const zone = getTriageZoneAtPosition(e.clientX, e.clientY);
         if (zone !== triageHoveredZone) {
@@ -1209,6 +1221,11 @@ document.addEventListener('DOMContentLoaded', () => {
     async function endTriageDrag(e) {
         if (!triageIsDragging || !triageDraggedItem) return;
 
+        // Check delete zone
+        const dropRect = editDropZone.getBoundingClientRect();
+        const droppedInDeleteZone = e.clientX >= dropRect.left && e.clientX <= dropRect.right &&
+                                    e.clientY >= dropRect.top && e.clientY <= dropRect.bottom;
+
         const zone = getTriageZoneAtPosition(e.clientX, e.clientY);
         const targetZone = zone ? zone.closest('.triage-zone') : null;
         const zoneName = targetZone ? targetZone.dataset.zone : null;
@@ -1218,8 +1235,14 @@ document.addEventListener('DOMContentLoaded', () => {
             triageHoveredZone.classList.remove('zone-hover');
             triageHoveredZone = null;
         }
+        editDropZone.classList.remove('visible', 'drag-over');
 
-        if (zoneName && tasksData.inbox && tasksData.inbox[triageDraggedIndex]) {
+        if (droppedInDeleteZone && tasksData.inbox && tasksData.inbox[triageDraggedIndex]) {
+            // Verwijder taak
+            tasksData.inbox.splice(triageDraggedIndex, 1);
+            resetTriageDrag();
+            await saveAllTasks();
+        } else if (zoneName && tasksData.inbox && tasksData.inbox[triageDraggedIndex]) {
             const task = { ...tasksData.inbox[triageDraggedIndex] };
             tasksData.inbox.splice(triageDraggedIndex, 1);
 
@@ -1257,6 +1280,7 @@ document.addEventListener('DOMContentLoaded', () => {
         triageDraggedItem = null;
         triageDraggedIndex = null;
         triagePlaceholder = null;
+        editDropZone.classList.remove('visible', 'drag-over');
         document.body.classList.remove('is-triage-dragging');
         document.body.style.userSelect = '';
     }
@@ -1297,6 +1321,8 @@ document.addEventListener('DOMContentLoaded', () => {
             <button class="triage-time-btn" data-min="30">30m</button>
             <button class="triage-time-btn" data-min="60">1u</button>
             <button class="triage-time-btn" data-min="120">2u</button>
+            <button class="triage-time-btn" data-min="180">3u</button>
+            <button class="triage-time-btn" data-min="360">6u</button>
         `;
 
         wrapper.appendChild(card);
