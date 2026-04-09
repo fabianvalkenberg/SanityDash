@@ -99,58 +99,102 @@ function buildContextBlock(context) {
     ].join('\n');
 }
 
-async function processWithLMStudio(transcript, prompt, modelId, context) {
-    const systemPrompt = prompt + '\n\nBELANGRIJK: Retourneer ALLEEN een JSON object met de velden "subject" (string) en "body" (string). Geen thinking tokens, geen uitleg, geen markdown code fences — puur het JSON object.';
-    const contextBlock = buildContextBlock(context);
-
+async function callLMStudio(body) {
     const response = await fetch(`${LM_STUDIO_URL}/v1/chat/completions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            model: modelId || 'local-model',
-            messages: [
-                { role: 'system', content: systemPrompt },
-                { role: 'user', content: `${contextBlock}Herschrijf onderstaand transcript naar een nette zakelijke mail:\n\n${transcript}` }
-            ],
-            temperature: 0.5,
-            stream: false,
-            response_format: {
-                type: 'json_schema',
-                json_schema: {
-                    name: 'mail',
-                    strict: true,
-                    schema: {
-                        type: 'object',
-                        properties: {
-                            subject: { type: 'string', description: 'Korte concrete onderwerpregel' },
-                            body: { type: 'string', description: 'Volledige mail-body met aanhef, inhoud en afsluiting' }
-                        },
-                        required: ['subject', 'body'],
-                        additionalProperties: false
-                    }
-                }
-            }
-        }),
+        body: JSON.stringify(body),
         signal: AbortSignal.timeout(180000)
     });
 
     if (!response.ok) {
         const errText = await response.text();
-        throw new Error(`LM Studio error ${response.status}: ${errText.slice(0, 200)}`);
+        const err = new Error(`LM Studio HTTP ${response.status}: ${errText.slice(0, 300)}`);
+        err.status = response.status;
+        err.rawBody = errText;
+        throw err;
     }
 
     const data = await response.json();
-    const content = data.choices && data.choices[0] && data.choices[0].message
+    return data.choices && data.choices[0] && data.choices[0].message
         ? data.choices[0].message.content
         : '';
+}
 
-    const parsed = extractJson(content);
-    if (!parsed || typeof parsed.subject !== 'string' || typeof parsed.body !== 'string') {
-        console.error('[mail] LM Studio raw response:', content);
-        throw new Error('Ongeldig JSON response van LM Studio: ' + content.slice(0, 200));
+async function processWithLMStudio(transcript, prompt, modelId, context) {
+    const systemPrompt = prompt + [
+        '',
+        '',
+        'BELANGRIJK voor je output:',
+        '- Retourneer ALLEEN een JSON object met exact twee string-velden: "subject" en "body".',
+        '- Geen uitleg vooraf of achteraf.',
+        '- Geen markdown code fences.',
+        '- Geen <think>...</think> reasoning tokens in de output.',
+        '- Het eerste teken van je antwoord moet { zijn, het laatste }.',
+        '',
+        'Voorbeeld van geldig antwoord:',
+        '{"subject": "Terugkoppeling gesprek", "body": "Hoi,\\n\\nHier is de mail...\\n\\nGroet,\\nFabian"}'
+    ].join('\n');
+    const contextBlock = buildContextBlock(context);
+    const userMessage = `${contextBlock}Herschrijf onderstaand transcript naar een nette zakelijke mail en geef ALLEEN het JSON object terug:\n\n${transcript}`;
+
+    const baseBody = {
+        model: modelId || 'local-model',
+        messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userMessage }
+        ],
+        temperature: 0.3,
+        stream: false
+    };
+
+    // Strategie: probeer eerst plain (meest compatibel met reasoning models).
+    // LM Studio ondersteunt alleen 'json_schema' of 'text', niet 'json_object'.
+    // Als plain niet lukt, val terug op json_schema strict.
+    const attempts = [
+        { label: 'plain', body: baseBody },
+        {
+            label: 'json_schema',
+            body: {
+                ...baseBody,
+                response_format: {
+                    type: 'json_schema',
+                    json_schema: {
+                        name: 'mail',
+                        strict: true,
+                        schema: {
+                            type: 'object',
+                            properties: {
+                                subject: { type: 'string' },
+                                body: { type: 'string' }
+                            },
+                            required: ['subject', 'body'],
+                            additionalProperties: false
+                        }
+                    }
+                }
+            }
+        }
+    ];
+
+    let lastError = null;
+    for (const attempt of attempts) {
+        try {
+            const content = await callLMStudio(attempt.body);
+            const parsed = extractJson(content);
+            if (parsed && typeof parsed.subject === 'string' && typeof parsed.body === 'string') {
+                return { subject: parsed.subject, body: parsed.body, source: 'lm-studio' };
+            }
+            console.warn(`[mail] LM Studio (${attempt.label}) returned invalid JSON:`, content.slice(0, 400));
+            lastError = new Error(`Ongeldig JSON van LM Studio (${attempt.label})`);
+            lastError.rawContent = content;
+        } catch (error) {
+            console.warn(`[mail] LM Studio (${attempt.label}) failed:`, error.message);
+            lastError = error;
+        }
     }
 
-    return { subject: parsed.subject, body: parsed.body, source: 'lm-studio' };
+    throw lastError || new Error('LM Studio gaf geen bruikbaar antwoord');
 }
 
 async function processWithClaude(transcript, context) {
