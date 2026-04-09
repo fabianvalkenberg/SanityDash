@@ -1212,6 +1212,7 @@ body.is-triage-dragging .triage-inbox-item:hover {
 }
 
 .edit-mail-generate {
+    position: relative;
     background: var(--color-accent);
     color: var(--color-white);
     border: none;
@@ -1222,6 +1223,11 @@ body.is-triage-dragging .triage-inbox-item:hover {
     font-weight: 500;
     cursor: pointer;
     transition: background-color 0.2s ease, opacity 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 140px;
+    justify-content: center;
 }
 
 .edit-mail-generate:hover:not(:disabled) {
@@ -1229,8 +1235,30 @@ body.is-triage-dragging .triage-inbox-item:hover {
 }
 
 .edit-mail-generate:disabled {
-    opacity: 0.5;
+    opacity: 0.7;
     cursor: not-allowed;
+}
+
+.edit-mail-spinner {
+    display: none;
+    width: 16px;
+    height: 16px;
+    border: 2px solid rgba(255, 255, 255, 0.4);
+    border-top-color: var(--color-white);
+    border-radius: 50%;
+    animation: mail-spin 0.7s linear infinite;
+}
+
+.edit-mail-generate.loading .edit-mail-spinner {
+    display: inline-block;
+}
+
+.edit-mail-generate.loading .edit-mail-generate-label {
+    opacity: 0.8;
+}
+
+@keyframes mail-spin {
+    to { transform: rotate(360deg); }
 }
 
 .edit-mail-status {
@@ -1238,6 +1266,9 @@ body.is-triage-dragging .triage-inbox-item:hover {
     font-size: 13px;
     opacity: 0.7;
     margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 8px;
 }
 
 .edit-mail-status.error {
@@ -1245,73 +1276,124 @@ body.is-triage-dragging .triage-inbox-item:hover {
     opacity: 1;
 }
 
+.edit-mail-status.success {
+    color: #a8e6a8;
+    opacity: 1;
+}
+
 .edit-mail-result {
-    background: var(--color-white);
-    border-radius: 4px;
-    padding: 24px;
     display: flex;
     flex-direction: column;
-    gap: 16px;
-    max-height: 45vh;
-    overflow: hidden;
+    gap: 12px;
+    max-height: 55vh;
+    overflow-y: auto;
+    padding-right: 4px;
 }
 
 .edit-mail-result.hidden {
     display: none;
 }
 
-.edit-mail-result-subject {
-    font-size: 18px;
-    font-weight: 600;
-    color: var(--color-dark-gray);
-    padding-bottom: 12px;
-    border-bottom: 1px solid #eee;
+/* Click-to-copy zones (geïnspireerd door fappiewriter skill artifact) */
+.edit-mail-zone {
+    background: var(--color-white);
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 16px 18px;
+    cursor: pointer;
+    position: relative;
+    transition: border-color 0.3s ease, transform 0.15s ease;
 }
 
-.edit-mail-result-body {
-    font-size: 14px;
-    color: var(--color-dark-gray);
-    line-height: 1.6;
-    white-space: pre-wrap;
-    overflow-y: auto;
-    max-height: 28vh;
+.edit-mail-zone:hover {
+    border-color: #c0c0c0;
+    transform: translateY(-1px);
+}
+
+.edit-mail-zone.copied {
+    border-color: #16a34a;
+}
+
+.edit-mail-zone-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+    font-family: system-ui, -apple-system, sans-serif;
+    pointer-events: none;
+}
+
+.edit-mail-zone-label {
+    font-size: 11px;
+    color: #666;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 500;
+}
+
+.edit-mail-zone-badge {
+    font-size: 11px;
+    color: #999;
+    transition: color 0.3s ease;
+}
+
+.edit-mail-zone.copied .edit-mail-zone-badge {
+    color: #16a34a;
+    font-weight: 500;
+}
+
+.edit-mail-zone-content {
+    color: #222;
+    font-family: Aptos, Calibri, 'Segoe UI', sans-serif;
+    font-size: 12pt;
+    line-height: 1.5;
+    word-wrap: break-word;
+    pointer-events: none;
+}
+
+.edit-mail-zone-content--body {
+    white-space: normal;
+}
+
+.edit-mail-zone-content--body p {
+    margin: 0 0 12px 0;
+}
+
+.edit-mail-zone-content--body p:last-child {
+    margin-bottom: 0;
+}
+
+.edit-mail-zone-content--body p.heading {
+    font-weight: bold;
+    margin: 16px 0 8px 0;
+}
+
+.edit-mail-zone-content--body p.heading:first-child {
+    margin-top: 0;
 }
 
 .edit-mail-result-actions {
     display: flex;
     gap: 12px;
     justify-content: flex-end;
-    padding-top: 8px;
-    border-top: 1px solid #eee;
-}
-
-.edit-mail-regen,
-.edit-mail-copy {
-    padding: 10px 20px;
-    border: none;
-    border-radius: 4px;
-    font-family: var(--font-family);
-    font-size: 14px;
-    cursor: pointer;
-    transition: background-color 0.2s ease;
+    padding-top: 4px;
 }
 
 .edit-mail-regen {
-    background: var(--color-light-gray);
-    color: var(--color-dark-gray);
+    padding: 10px 20px;
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    border-radius: 4px;
+    background: transparent;
+    color: var(--color-light-gray);
+    font-family: var(--font-family);
+    font-size: 14px;
+    cursor: pointer;
+    transition: background-color 0.2s ease, border-color 0.2s ease;
 }
 
 .edit-mail-regen:hover {
-    background: #c5c5c5;
-}
-
-.edit-mail-copy {
-    background: var(--color-accent);
-    color: var(--color-white);
-}
-
-.edit-mail-copy:hover {
-    background: #d94d1c;
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.5);
 }
 
 /* Mobiel */

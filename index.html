@@ -180,15 +180,29 @@
                     <button class="edit-mail-mic" id="editMailMic" type="button" title="Dictatie starten">
                         <img src="assets/icons/mic.svg" alt="Mic">
                     </button>
-                    <button class="edit-mail-generate" id="editMailGenerate" type="button">Maak mail</button>
+                    <button class="edit-mail-generate" id="editMailGenerate" type="button">
+                        <span class="edit-mail-generate-label">Maak mail</span>
+                        <span class="edit-mail-spinner" aria-hidden="true"></span>
+                    </button>
                     <span class="edit-mail-status" id="editMailStatus"></span>
                 </div>
                 <div class="edit-mail-result hidden" id="editMailResult">
-                    <div class="edit-mail-result-subject" id="editMailResultSubject"></div>
-                    <div class="edit-mail-result-body" id="editMailResultBody"></div>
+                    <div class="edit-mail-zone" id="editMailSubjectZone" data-copy-target="subject">
+                        <div class="edit-mail-zone-header">
+                            <span class="edit-mail-zone-label">Onderwerp</span>
+                            <span class="edit-mail-zone-badge">klik om te kopiëren</span>
+                        </div>
+                        <div class="edit-mail-zone-content" id="editMailSubjectContent"></div>
+                    </div>
+                    <div class="edit-mail-zone" id="editMailBodyZone" data-copy-target="body">
+                        <div class="edit-mail-zone-header">
+                            <span class="edit-mail-zone-label">Bericht</span>
+                            <span class="edit-mail-zone-badge">klik om te kopiëren</span>
+                        </div>
+                        <div class="edit-mail-zone-content edit-mail-zone-content--body" id="editMailBodyContent"></div>
+                    </div>
                     <div class="edit-mail-result-actions">
-                        <button class="edit-mail-regen" id="editMailRegen" type="button">Opnieuw</button>
-                        <button class="edit-mail-copy" id="editMailCopy" type="button">Kopieer</button>
+                        <button class="edit-mail-regen" id="editMailRegen" type="button">Opnieuw genereren</button>
                     </div>
                 </div>
             </div>
