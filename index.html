@@ -173,40 +173,6 @@
                 <input type="text" class="edit-input" id="editContactTask" placeholder="Taak">
             </div>
 
-            <!-- Mail dictation section (alleen zichtbaar voor mailen-taken) -->
-            <div class="edit-mail-section hidden" id="editMailSection">
-                <textarea class="edit-mail-transcript" id="editMailTranscript" placeholder="Dicteer of plak hier je mail…"></textarea>
-                <div class="edit-mail-controls">
-                    <button class="edit-mail-mic" id="editMailMic" type="button" title="Dictatie starten">
-                        <img src="assets/icons/mic.svg" alt="Mic">
-                    </button>
-                    <button class="edit-mail-generate" id="editMailGenerate" type="button">
-                        <span class="edit-mail-generate-label">Maak mail</span>
-                        <span class="edit-mail-spinner" aria-hidden="true"></span>
-                    </button>
-                    <span class="edit-mail-status" id="editMailStatus"></span>
-                </div>
-                <div class="edit-mail-result hidden" id="editMailResult">
-                    <div class="edit-mail-zone" id="editMailSubjectZone" data-copy-target="subject">
-                        <div class="edit-mail-zone-header">
-                            <span class="edit-mail-zone-label">Onderwerp</span>
-                            <span class="edit-mail-zone-badge">klik om te kopiëren</span>
-                        </div>
-                        <div class="edit-mail-zone-content" id="editMailSubjectContent"></div>
-                    </div>
-                    <div class="edit-mail-zone" id="editMailBodyZone" data-copy-target="body">
-                        <div class="edit-mail-zone-header">
-                            <span class="edit-mail-zone-label">Bericht</span>
-                            <span class="edit-mail-zone-badge">klik om te kopiëren</span>
-                        </div>
-                        <div class="edit-mail-zone-content edit-mail-zone-content--body" id="editMailBodyContent"></div>
-                    </div>
-                    <div class="edit-mail-result-actions">
-                        <button class="edit-mail-regen" id="editMailRegen" type="button">Opnieuw genereren</button>
-                    </div>
-                </div>
-            </div>
-
             <div class="edit-time-selector" id="timeSelector">
                 <button class="time-btn" data-time="15">15m</button>
                 <button class="time-btn" data-time="30">30m</button>

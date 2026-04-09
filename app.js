@@ -1,5 +1,4 @@
 import { getTasksFromCloud, saveTasksToCloud, subscribeToTasks, getContactsFromCloud, saveContactsToCloud } from './firebase.js';
-import { generateMail, checkLMStudio } from './mail-worker.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     const editModal = document.getElementById('editModal');
@@ -839,7 +838,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const category = column.dataset.category;
         const isPlanningOrInbox = category === 'planning' || category === 'inbox';
-        const isMailen = category === 'mailen';
 
         if (isPlanningOrInbox) {
             editInput.classList.remove('hidden');
@@ -851,10 +849,6 @@ document.addEventListener('DOMContentLoaded', () => {
             contactFields.classList.remove('hidden');
             timeSelector.classList.add('hidden');
         }
-
-        // Toon mail-sectie alleen voor mailen-taken (niet voor nieuwe, want nog niks om te dicteren op)
-        editMailSection.classList.toggle('hidden', !isMailen);
-        resetMailSection();
 
         if (isNew) {
             editInput.value = '';
@@ -881,9 +875,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 } else {
                     editContactName.value = taskData.naam || '';
                     editContactTask.value = taskData.taak || '';
-                    if (isMailen) {
-                        populateMailSection(taskData);
-                    }
                 }
             }
         }
@@ -906,7 +897,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function closeEditModal() {
         editModal.classList.remove('active');
-        stopMailRecording();
         currentTask = null;
         currentColumn = null;
         isNewTask = false;
@@ -1534,312 +1524,6 @@ document.addEventListener('DOMContentLoaded', () => {
         document.execCommand('copy');
         document.body.removeChild(ta);
     }
-
-    // ===================
-    // MAIL DICTATIE (in edit-modal)
-    // ===================
-    const editMailSection = document.getElementById('editMailSection');
-    const editMailTranscript = document.getElementById('editMailTranscript');
-    const editMailMic = document.getElementById('editMailMic');
-    const editMailGenerate = document.getElementById('editMailGenerate');
-    const editMailStatus = document.getElementById('editMailStatus');
-    const editMailResult = document.getElementById('editMailResult');
-    const editMailSubjectZone = document.getElementById('editMailSubjectZone');
-    const editMailSubjectContent = document.getElementById('editMailSubjectContent');
-    const editMailBodyZone = document.getElementById('editMailBodyZone');
-    const editMailBodyContent = document.getElementById('editMailBodyContent');
-    const editMailRegen = document.getElementById('editMailRegen');
-
-    let speechRecognition = null;
-    let isRecording = false;
-    let mailSpeechFinalTranscript = '';
-
-    function initMailSpeechRecognition() {
-        const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-        if (!SR) return null;
-
-        const rec = new SR();
-        rec.lang = 'nl-NL';
-        rec.continuous = true;
-        rec.interimResults = true;
-
-        rec.onresult = (event) => {
-            let interim = '';
-            for (let i = event.resultIndex; i < event.results.length; i++) {
-                const transcript = event.results[i][0].transcript;
-                if (event.results[i].isFinal) {
-                    mailSpeechFinalTranscript += transcript;
-                } else {
-                    interim += transcript;
-                }
-            }
-            editMailTranscript.value = mailSpeechFinalTranscript + interim;
-        };
-
-        rec.onerror = (event) => {
-            console.error('Speech recognition error:', event.error);
-            stopMailRecording();
-        };
-
-        rec.onend = () => {
-            if (isRecording) {
-                try { rec.start(); } catch (e) {}
-            }
-        };
-
-        return rec;
-    }
-
-    function startMailRecording() {
-        if (!speechRecognition) {
-            speechRecognition = initMailSpeechRecognition();
-        }
-        if (!speechRecognition) {
-            editMailTranscript.focus();
-            setMailStatus('Dictatie niet beschikbaar — gebruik de mic-knop op je toetsenbord', true);
-            return;
-        }
-        isRecording = true;
-        mailSpeechFinalTranscript = editMailTranscript.value;
-        try {
-            speechRecognition.start();
-            editMailMic.classList.add('recording');
-        } catch (e) {
-            console.error(e);
-            isRecording = false;
-        }
-    }
-
-    function stopMailRecording() {
-        isRecording = false;
-        if (speechRecognition) {
-            try { speechRecognition.stop(); } catch (e) {}
-        }
-        if (editMailMic) editMailMic.classList.remove('recording');
-    }
-
-    function setMailStatus(text, state = '') {
-        // state: '' | 'error' | 'success'
-        if (!editMailStatus) return;
-        editMailStatus.textContent = text || '';
-        editMailStatus.classList.remove('error', 'success');
-        if (state === 'error') editMailStatus.classList.add('error');
-        else if (state === 'success') editMailStatus.classList.add('success');
-    }
-
-    function setMailLoading(loading) {
-        if (!editMailGenerate) return;
-        editMailGenerate.disabled = !!loading;
-        editMailGenerate.classList.toggle('loading', !!loading);
-    }
-
-    function escapeHtmlBasic(s) {
-        return String(s || '')
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;');
-    }
-
-    // Converteer body-markdown (`**bold**` + alinea's) naar inline-styled HTML
-    // dat netjes plakt in Outlook / Gmail / Word.
-    function renderMailBodyHtml(body) {
-        if (!body) return '';
-        const blocks = String(body).split(/\n\s*\n/); // lege regel = alinea-break
-        const parts = [];
-        blocks.forEach(block => {
-            const trimmed = block.trim();
-            if (!trimmed) return;
-
-            // Hele alinea is één bold-blok → behandel als heading
-            const headingMatch = trimmed.match(/^\*\*(.+)\*\*$/s);
-            if (headingMatch) {
-                parts.push('<p class="heading">' + escapeHtmlBasic(headingMatch[1]) + '</p>');
-                return;
-            }
-
-            // Gewone alinea: enkele newlines → <br>, inline **bold** → <strong>
-            let html = escapeHtmlBasic(trimmed).replace(/\n/g, '<br>');
-            html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
-            parts.push('<p>' + html + '</p>');
-        });
-        return parts.join('');
-    }
-
-    function setZoneBadge(zoneEl, text) {
-        const badge = zoneEl.querySelector('.edit-mail-zone-badge');
-        if (badge) badge.textContent = text;
-    }
-
-    function resetZone(zoneEl) {
-        zoneEl.classList.remove('copied');
-        setZoneBadge(zoneEl, 'klik om te kopiëren');
-    }
-
-    function markZoneCopied(zoneEl) {
-        zoneEl.classList.add('copied');
-        setZoneBadge(zoneEl, '✓ gekopieerd');
-        setTimeout(() => {
-            if (zoneEl.classList.contains('copied')) {
-                zoneEl.classList.remove('copied');
-                setZoneBadge(zoneEl, 'klik om te kopiëren');
-            }
-        }, 2500);
-    }
-
-    function showMailResult(subject, body) {
-        editMailSubjectContent.textContent = subject || '';
-        editMailBodyContent.innerHTML = renderMailBodyHtml(body);
-        resetZone(editMailSubjectZone);
-        resetZone(editMailBodyZone);
-        editMailResult.classList.remove('hidden');
-    }
-
-    function hideMailResult() {
-        editMailResult.classList.add('hidden');
-        editMailSubjectContent.textContent = '';
-        editMailBodyContent.innerHTML = '';
-        resetZone(editMailSubjectZone);
-        resetZone(editMailBodyZone);
-    }
-
-    // Kopieer een zone als HTML + plain text, zodat paste in Outlook met
-    // opmaak blijft en in simpele velden als tekst.
-    async function copyZone(zoneEl, contentEl) {
-        const html = contentEl.innerHTML;
-        const plain = contentEl.innerText;
-        let ok = false;
-        try {
-            if (navigator.clipboard && window.ClipboardItem) {
-                const item = new ClipboardItem({
-                    'text/html': new Blob([html], { type: 'text/html' }),
-                    'text/plain': new Blob([plain], { type: 'text/plain' })
-                });
-                await navigator.clipboard.write([item]);
-                ok = true;
-            }
-        } catch (e) {
-            console.warn('[mail] ClipboardItem failed, trying fallback:', e);
-        }
-        if (!ok) {
-            try {
-                // Fallback: selecteer het element en execCommand copy
-                const range = document.createRange();
-                range.selectNodeContents(contentEl);
-                const sel = window.getSelection();
-                sel.removeAllRanges();
-                sel.addRange(range);
-                document.execCommand('copy');
-                sel.removeAllRanges();
-                ok = true;
-            } catch (e) {
-                console.error('[mail] copy fallback failed:', e);
-            }
-        }
-        if (ok) {
-            markZoneCopied(zoneEl);
-        }
-    }
-
-    function resetMailSection() {
-        stopMailRecording();
-        editMailTranscript.value = '';
-        setMailStatus('');
-        hideMailResult();
-    }
-
-    function populateMailSection(taskData) {
-        if (!taskData) {
-            resetMailSection();
-            return;
-        }
-        editMailTranscript.value = taskData.transcript || '';
-        if (taskData.subject && taskData.body) {
-            showMailResult(taskData.subject, taskData.body);
-            const sourceLabel = taskData.mailSource === 'lm-studio' ? 'lokaal' : (taskData.mailSource === 'claude' ? 'Claude' : '');
-            setMailStatus(sourceLabel ? `Eerder gegenereerd (${sourceLabel})` : 'Eerder gegenereerd', 'success');
-        } else {
-            hideMailResult();
-            setMailStatus('');
-        }
-    }
-
-    async function handleGenerateMail() {
-        const transcript = editMailTranscript.value.trim();
-        if (!transcript) {
-            setMailStatus('Eerst transcript toevoegen', 'error');
-            return;
-        }
-        stopMailRecording();
-        setMailLoading(true);
-        hideMailResult();
-        setMailStatus('Bezig…');
-
-        // Context uit het huidige formulier
-        const context = {
-            naam: (editContactName.value || '').trim(),
-            taak: (editContactTask.value || '').trim()
-        };
-
-        try {
-            const result = await generateMail(transcript, (msg) => setMailStatus(msg), context);
-            showMailResult(result.subject, result.body);
-            setMailStatus(result.source === 'lm-studio' ? 'Lokaal gegenereerd' : 'Via Claude gegenereerd', 'success');
-
-            // Sla op de task op zodat het bij heropen beschikbaar is
-            if (currentTask && !isNewTask) {
-                const taskCategory = currentTask.dataset.category;
-                const index = parseInt(currentTask.dataset.index);
-                if (tasksData[taskCategory] && tasksData[taskCategory][index]) {
-                    tasksData[taskCategory][index] = {
-                        ...tasksData[taskCategory][index],
-                        transcript,
-                        subject: result.subject,
-                        body: result.body,
-                        mailSource: result.source,
-                        mailGeneratedAt: new Date().toISOString()
-                    };
-                    await saveAllTasks();
-                }
-            }
-        } catch (error) {
-            console.error('[mail] generate failed:', error);
-            const msg = (error && error.message) ? error.message : 'Er ging iets mis';
-            // Truncate lange error messages
-            setMailStatus(msg.length > 120 ? msg.slice(0, 120) + '…' : msg, 'error');
-        } finally {
-            setMailLoading(false);
-        }
-    }
-
-    function handleRegenerateMail() {
-        hideMailResult();
-        setMailStatus('');
-        handleGenerateMail();
-    }
-
-    // Event listeners mail-sectie
-    if (editMailMic) {
-        editMailMic.addEventListener('click', () => {
-            if (isRecording) stopMailRecording();
-            else startMailRecording();
-        });
-    }
-    if (editMailGenerate) {
-        editMailGenerate.addEventListener('click', handleGenerateMail);
-    }
-    if (editMailSubjectZone) {
-        editMailSubjectZone.addEventListener('click', () => copyZone(editMailSubjectZone, editMailSubjectContent));
-    }
-    if (editMailBodyZone) {
-        editMailBodyZone.addEventListener('click', () => copyZone(editMailBodyZone, editMailBodyContent));
-    }
-    if (editMailRegen) {
-        editMailRegen.addEventListener('click', handleRegenerateMail);
-    }
-
-    // Initial LM Studio check (cache voor snellere eerste generate)
-    checkLMStudio().catch(() => {});
 
     // Initialize Firebase data
     initializeData();
