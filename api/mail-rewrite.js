@@ -39,10 +39,25 @@ export default async function handler(req, res) {
         return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    const { transcript } = req.body || {};
+    const { transcript, context } = req.body || {};
     if (!transcript || typeof transcript !== 'string') {
         return res.status(400).json({ error: 'Transcript is required' });
     }
+
+    function buildContextBlock(ctx) {
+        if (!ctx) return '';
+        const lines = [];
+        if (ctx.naam) lines.push(`- Ontvanger (uit de taak): ${ctx.naam}`);
+        if (ctx.taak) lines.push(`- Onderwerp volgens taak: ${ctx.taak}`);
+        if (lines.length === 0) return '';
+        return [
+            'Context over deze mail:',
+            ...lines,
+            `Gebruik de naam van de ontvanger in de aanhef (bv. "Hoi ${ctx.naam || '[naam]'},"). Negeer deze context alleen als het transcript expliciet een andere ontvanger noemt.`,
+            ''
+        ].join('\n');
+    }
+    const contextBlock = buildContextBlock(context);
 
     const CLAUDE_API_KEY = process.env.CLAUDE_API_KEY;
     if (!CLAUDE_API_KEY) {
@@ -75,7 +90,7 @@ export default async function handler(req, res) {
                 messages: [
                     {
                         role: 'user',
-                        content: `Herschrijf onderstaand transcript naar een nette zakelijke mail. Retourneer ALLEEN een JSON object met velden "subject" en "body".\n\nTranscript:\n${transcript}`
+                        content: `${contextBlock}Herschrijf onderstaand transcript naar een nette zakelijke mail. Retourneer ALLEEN een JSON object met velden "subject" en "body".\n\nTranscript:\n${transcript}`
                     }
                 ]
             })

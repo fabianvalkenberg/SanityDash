@@ -1667,8 +1667,15 @@ document.addEventListener('DOMContentLoaded', () => {
         editMailGenerate.disabled = true;
         hideMailResult();
         setMailStatus('Bezig…');
+
+        // Context uit het huidige formulier (eerst live waarden, dan taakdata als fallback)
+        const context = {
+            naam: (editContactName.value || '').trim(),
+            taak: (editContactTask.value || '').trim()
+        };
+
         try {
-            const result = await generateMail(transcript, (msg) => setMailStatus(msg));
+            const result = await generateMail(transcript, (msg) => setMailStatus(msg), context);
             showMailResult(result.subject, result.body);
             setMailStatus(result.source === 'lm-studio' ? 'Lokaal gegenereerd' : 'Via Claude gegenereerd');
 

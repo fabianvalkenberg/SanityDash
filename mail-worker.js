@@ -41,23 +41,67 @@ export async function checkLMStudio(force = false) {
 }
 
 function extractJson(text) {
+    if (!text) return null;
+
+    // 1. Strip <think>...</think> blokken (Qwen reasoning models)
+    let cleaned = text.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+
+    // 2. Strip markdown code fences (```json ... ``` of ``` ... ```)
+    const fenceMatch = cleaned.match(/```(?:json)?\s*([\s\S]*?)```/i);
+    if (fenceMatch) cleaned = fenceMatch[1].trim();
+
+    // 3. Probeer direct te parsen
     try {
-        return JSON.parse(text);
-    } catch (e) {
-        const match = text.match(/\{[\s\S]*\}/);
-        if (match) {
-            try {
-                return JSON.parse(match[0]);
-            } catch (e2) {
-                return null;
+        return JSON.parse(cleaned);
+    } catch (e) {}
+
+    // 4. Zoek het eerste balanced { ... } blok
+    const firstBrace = cleaned.indexOf('{');
+    if (firstBrace >= 0) {
+        let depth = 0;
+        let inString = false;
+        let escape = false;
+        for (let i = firstBrace; i < cleaned.length; i++) {
+            const ch = cleaned[i];
+            if (escape) { escape = false; continue; }
+            if (ch === '\\') { escape = true; continue; }
+            if (ch === '"') { inString = !inString; continue; }
+            if (inString) continue;
+            if (ch === '{') depth++;
+            else if (ch === '}') {
+                depth--;
+                if (depth === 0) {
+                    const slice = cleaned.slice(firstBrace, i + 1);
+                    try {
+                        return JSON.parse(slice);
+                    } catch (e) {
+                        return null;
+                    }
+                }
             }
         }
-        return null;
     }
+
+    return null;
 }
 
-async function processWithLMStudio(transcript, prompt, modelId) {
-    const systemPrompt = prompt + '\n\nRetourneer ALLEEN een JSON object met de velden "subject" en "body". Geen extra tekst, geen markdown code fences.';
+function buildContextBlock(context) {
+    if (!context) return '';
+    const lines = [];
+    if (context.naam) lines.push(`- Ontvanger (uit de taak): ${context.naam}`);
+    if (context.taak) lines.push(`- Onderwerp volgens taak: ${context.taak}`);
+    if (lines.length === 0) return '';
+    return [
+        'Context over deze mail:',
+        ...lines,
+        'Gebruik de naam van de ontvanger in de aanhef (bv. "Hoi ' + (context.naam || '[naam]') + ',"). Negeer deze context alleen als het transcript expliciet een andere ontvanger noemt.',
+        ''
+    ].join('\n');
+}
+
+async function processWithLMStudio(transcript, prompt, modelId, context) {
+    const systemPrompt = prompt + '\n\nBELANGRIJK: Retourneer ALLEEN een JSON object met de velden "subject" (string) en "body" (string). Geen thinking tokens, geen uitleg, geen markdown code fences — puur het JSON object.';
+    const contextBlock = buildContextBlock(context);
 
     const response = await fetch(`${LM_STUDIO_URL}/v1/chat/completions`, {
         method: 'POST',
@@ -66,12 +110,28 @@ async function processWithLMStudio(transcript, prompt, modelId) {
             model: modelId || 'local-model',
             messages: [
                 { role: 'system', content: systemPrompt },
-                { role: 'user', content: `Herschrijf onderstaand transcript naar een nette zakelijke mail:\n\n${transcript}` }
+                { role: 'user', content: `${contextBlock}Herschrijf onderstaand transcript naar een nette zakelijke mail:\n\n${transcript}` }
             ],
-            temperature: 0.7,
-            stream: false
+            temperature: 0.5,
+            stream: false,
+            response_format: {
+                type: 'json_schema',
+                json_schema: {
+                    name: 'mail',
+                    strict: true,
+                    schema: {
+                        type: 'object',
+                        properties: {
+                            subject: { type: 'string', description: 'Korte concrete onderwerpregel' },
+                            body: { type: 'string', description: 'Volledige mail-body met aanhef, inhoud en afsluiting' }
+                        },
+                        required: ['subject', 'body'],
+                        additionalProperties: false
+                    }
+                }
+            }
         }),
-        signal: AbortSignal.timeout(120000)
+        signal: AbortSignal.timeout(180000)
     });
 
     if (!response.ok) {
@@ -86,13 +146,14 @@ async function processWithLMStudio(transcript, prompt, modelId) {
 
     const parsed = extractJson(content);
     if (!parsed || typeof parsed.subject !== 'string' || typeof parsed.body !== 'string') {
-        throw new Error('Ongeldig JSON response van LM Studio');
+        console.error('[mail] LM Studio raw response:', content);
+        throw new Error('Ongeldig JSON response van LM Studio: ' + content.slice(0, 200));
     }
 
     return { subject: parsed.subject, body: parsed.body, source: 'lm-studio' };
 }
 
-async function processWithClaude(transcript) {
+async function processWithClaude(transcript, context) {
     const token = localStorage.getItem('sanityDashToken');
     if (!token) throw new Error('Geen auth token');
 
@@ -102,7 +163,7 @@ async function processWithClaude(transcript) {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ transcript })
+        body: JSON.stringify({ transcript, context })
     });
 
     if (!response.ok) {
@@ -119,7 +180,8 @@ async function processWithClaude(transcript) {
 }
 
 // Hoofdfunctie: probeer LM Studio, val terug op Claude
-export async function generateMail(transcript, onStatus) {
+// context: { naam, taak } — optioneel, wordt als hint meegegeven aan het model
+export async function generateMail(transcript, onStatus, context) {
     if (!transcript || !transcript.trim()) {
         throw new Error('Transcript is leeg');
     }
@@ -133,7 +195,7 @@ export async function generateMail(transcript, onStatus) {
     if (lm.ok) {
         onStatus && onStatus(`Lokaal (${lm.modelId}) — dit kan een minuut duren`);
         try {
-            return await processWithLMStudio(transcript, prompt, lm.modelId);
+            return await processWithLMStudio(transcript, prompt, lm.modelId, context);
         } catch (error) {
             console.warn('[mail] LM Studio failed, falling back to Claude:', error);
             onStatus && onStatus('LM Studio faalde — terugvallen op Claude');
@@ -142,5 +204,5 @@ export async function generateMail(transcript, onStatus) {
         onStatus && onStatus('LM Studio offline — Claude wordt gebruikt');
     }
 
-    return await processWithClaude(transcript);
+    return await processWithClaude(transcript, context);
 }
