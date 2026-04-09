@@ -5,9 +5,10 @@ node_modules/
 .DS_Store
 Thumbs.db
 
-# IDE
+# IDE / tooling
 .idea/
 .vscode/
+.claude/
 *.swp
 *.swo
 

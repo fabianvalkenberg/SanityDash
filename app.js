@@ -1,4 +1,5 @@
-import { getTasksFromCloud, saveTasksToCloud, subscribeToTasks, getContactsFromCloud, saveContactsToCloud } from './firebase.js';
+import { getTasksFromCloud, saveTasksToCloud, subscribeToTasks, getContactsFromCloud, saveContactsToCloud, subscribeToMails, addMailToCloud, updateMailInCloud, deleteMailFromCloud } from './firebase.js';
+import { initMailWorker, updateWorkerMails, getWorkerStatus } from './mail-worker.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     const editModal = document.getElementById('editModal');
@@ -1524,6 +1525,315 @@ document.addEventListener('DOMContentLoaded', () => {
         document.execCommand('copy');
         document.body.removeChild(ta);
     }
+
+    // ===================
+    // MAIL DICTATIE
+    // ===================
+    let mailsData = [];
+    let currentMailResult = null;
+    let speechRecognition = null;
+    let isRecording = false;
+
+    const mailTranscript = document.getElementById('mailTranscript');
+    const mailMicBtn = document.getElementById('mailMicBtn');
+    const mailSubmitBtn = document.getElementById('mailSubmitBtn');
+    const mailQueueEl = document.getElementById('mailQueue');
+    const mailWorkerStatus = document.getElementById('mailWorkerStatus');
+    const mailResultModal = document.getElementById('mailResultModal');
+    const mailResultSubject = document.getElementById('mailResultSubject');
+    const mailResultBody = document.getElementById('mailResultBody');
+    const mailResultClose = document.getElementById('mailResultClose');
+    const mailResultCopy = document.getElementById('mailResultCopy');
+
+    function escapeHtml(s) {
+        if (!s) return '';
+        return String(s)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    function formatTimeAgo(iso) {
+        if (!iso) return '';
+        const diff = Date.now() - new Date(iso).getTime();
+        const sec = Math.floor(diff / 1000);
+        if (sec < 60) return 'net';
+        const min = Math.floor(sec / 60);
+        if (min < 60) return `${min}m`;
+        const hr = Math.floor(min / 60);
+        if (hr < 24) return `${hr}u`;
+        return `${Math.floor(hr / 24)}d`;
+    }
+
+    function statusLabel(status) {
+        switch (status) {
+            case 'pending': return 'wacht';
+            case 'processing': return 'bezig';
+            case 'done': return 'klaar';
+            case 'failed': return 'mislukt';
+            default: return status;
+        }
+    }
+
+    function renderMailPage() {
+        if (!mailQueueEl) return;
+        mailQueueEl.innerHTML = '';
+
+        if (!mailsData || mailsData.length === 0) {
+            const empty = document.createElement('div');
+            empty.className = 'mail-empty';
+            empty.textContent = 'Nog geen mails in de queue.';
+            mailQueueEl.appendChild(empty);
+            updateMailBadge();
+            return;
+        }
+
+        mailsData.forEach(mail => {
+            const item = document.createElement('div');
+            item.className = `mail-item mail-item--${mail.status}`;
+            item.dataset.mailId = mail.id;
+
+            const preview = (mail.transcript || '').slice(0, 140);
+            const modeLabel = mail.mode === 'claude' ? '⚡' : '🏠';
+
+            item.innerHTML = `
+                <div class="mail-item-header">
+                    <span class="mail-item-status">${statusLabel(mail.status)}</span>
+                    <span class="mail-item-mode">${modeLabel}</span>
+                    <span class="mail-item-time">${formatTimeAgo(mail.createdAt)}</span>
+                </div>
+                <div class="mail-item-transcript">${escapeHtml(preview)}${mail.transcript && mail.transcript.length > 140 ? '…' : ''}</div>
+                ${mail.status === 'done' ? `<div class="mail-item-subject">${escapeHtml(mail.subject || '')}</div>` : ''}
+                ${mail.status === 'failed' ? `<div class="mail-item-error">${escapeHtml(mail.error || 'onbekende fout')}</div>` : ''}
+                <div class="mail-item-actions">
+                    ${mail.status === 'pending' && mail.mode !== 'claude' ? `<button class="mail-item-btn mail-item-btn--escalate" data-action="escalate">⚡ nu</button>` : ''}
+                    ${mail.status === 'done' ? `<button class="mail-item-btn mail-item-btn--open" data-action="open">openen</button>` : ''}
+                    ${mail.status === 'failed' ? `<button class="mail-item-btn mail-item-btn--retry" data-action="retry">opnieuw</button>` : ''}
+                    <button class="mail-item-btn mail-item-btn--delete" data-action="delete">
+                        <img src="assets/icons/trash.svg" alt="Verwijderen">
+                    </button>
+                </div>
+            `;
+
+            item.querySelectorAll('[data-action]').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const action = btn.dataset.action;
+                    handleMailAction(mail, action);
+                });
+            });
+
+            mailQueueEl.appendChild(item);
+        });
+
+        updateMailBadge();
+    }
+
+    function updateMailBadge() {
+        const badge = document.getElementById('mailBadge');
+        if (!badge) return;
+        const count = mailsData.filter(m => m.status === 'done').length;
+        if (count > 0) {
+            badge.textContent = count;
+            badge.classList.add('visible');
+        } else {
+            badge.classList.remove('visible');
+        }
+    }
+
+    async function handleMailAction(mail, action) {
+        if (action === 'delete') {
+            await deleteMailFromCloud(mail.id);
+        } else if (action === 'escalate') {
+            await updateMailInCloud(mail.id, {
+                mode: 'claude',
+                status: 'pending',
+                workerLease: null,
+                attempts: 0,
+                error: null
+            });
+        } else if (action === 'retry') {
+            await updateMailInCloud(mail.id, {
+                status: 'pending',
+                workerLease: null,
+                attempts: 0,
+                error: null
+            });
+        } else if (action === 'open') {
+            openMailResultModal(mail);
+        }
+    }
+
+    function openMailResultModal(mail) {
+        currentMailResult = mail;
+        mailResultSubject.textContent = mail.subject || '';
+        mailResultBody.textContent = mail.body || '';
+        mailResultModal.classList.add('active');
+    }
+
+    function closeMailResultModal() {
+        mailResultModal.classList.remove('active');
+        currentMailResult = null;
+    }
+
+    async function copyMailResult() {
+        if (!currentMailResult) return;
+        const text = `Onderwerp: ${currentMailResult.subject}\n\n${currentMailResult.body}`;
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            try {
+                await navigator.clipboard.writeText(text);
+            } catch (e) {
+                fallbackCopy(text);
+            }
+        } else {
+            fallbackCopy(text);
+        }
+        mailResultCopy.textContent = 'Gekopieerd!';
+        setTimeout(() => { mailResultCopy.textContent = 'Kopieer'; }, 1500);
+    }
+
+    // ===================
+    // SPEECH RECOGNITION
+    // ===================
+    function initSpeechRecognition() {
+        const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SR) return null;
+
+        const rec = new SR();
+        rec.lang = 'nl-NL';
+        rec.continuous = true;
+        rec.interimResults = true;
+
+        let finalTranscript = '';
+
+        rec.onresult = (event) => {
+            let interim = '';
+            for (let i = event.resultIndex; i < event.results.length; i++) {
+                const transcript = event.results[i][0].transcript;
+                if (event.results[i].isFinal) {
+                    finalTranscript += transcript;
+                } else {
+                    interim += transcript;
+                }
+            }
+            mailTranscript.value = finalTranscript + interim;
+        };
+
+        rec.onerror = (event) => {
+            console.error('Speech recognition error:', event.error);
+            stopRecording();
+        };
+
+        rec.onend = () => {
+            if (isRecording) {
+                // Auto-restart bij continuous mode
+                try { rec.start(); } catch (e) {}
+            }
+        };
+
+        rec._reset = () => { finalTranscript = mailTranscript.value; };
+        return rec;
+    }
+
+    function startRecording() {
+        if (!speechRecognition) {
+            speechRecognition = initSpeechRecognition();
+        }
+        if (!speechRecognition) {
+            mailTranscript.focus();
+            alert('Dictatie niet beschikbaar in deze browser. Gebruik de microfoon-knop op je toetsenbord.');
+            return;
+        }
+        isRecording = true;
+        speechRecognition._reset();
+        try {
+            speechRecognition.start();
+            mailMicBtn.classList.add('recording');
+        } catch (e) {
+            console.error(e);
+            isRecording = false;
+        }
+    }
+
+    function stopRecording() {
+        isRecording = false;
+        if (speechRecognition) {
+            try { speechRecognition.stop(); } catch (e) {}
+        }
+        mailMicBtn.classList.remove('recording');
+    }
+
+    async function submitMailTranscript() {
+        const text = mailTranscript.value.trim();
+        if (!text) return;
+        stopRecording();
+        const id = await addMailToCloud({ transcript: text, mode: 'local' });
+        if (id) {
+            mailTranscript.value = '';
+        }
+    }
+
+    function updateWorkerStatusUI() {
+        if (!mailWorkerStatus) return;
+        const status = getWorkerStatus();
+        const label = mailWorkerStatus.querySelector('.mail-worker-label');
+        if (status.lmStudio && status.lmStudio.ok) {
+            mailWorkerStatus.classList.add('online');
+            if (label) label.textContent = `LM Studio online (${status.lmStudio.modelId || 'model'})`;
+        } else {
+            mailWorkerStatus.classList.remove('online');
+            if (label) label.textContent = 'LM Studio offline';
+        }
+    }
+
+    // Event listeners mail-pagina
+    if (mailMicBtn) {
+        mailMicBtn.addEventListener('click', () => {
+            if (isRecording) {
+                stopRecording();
+            } else {
+                startRecording();
+            }
+        });
+    }
+
+    if (mailSubmitBtn) {
+        mailSubmitBtn.addEventListener('click', submitMailTranscript);
+    }
+
+    if (mailTranscript) {
+        mailTranscript.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                e.preventDefault();
+                submitMailTranscript();
+            }
+        });
+    }
+
+    if (mailResultClose) {
+        mailResultClose.addEventListener('click', closeMailResultModal);
+    }
+    if (mailResultCopy) {
+        mailResultCopy.addEventListener('click', copyMailResult);
+    }
+    if (mailResultModal) {
+        mailResultModal.addEventListener('click', (e) => {
+            if (e.target === mailResultModal) closeMailResultModal();
+        });
+    }
+
+    // Subscribe naar mails + start worker
+    subscribeToMails((mails) => {
+        mailsData = mails || [];
+        updateWorkerMails(mailsData);
+        renderMailPage();
+    });
+
+    initMailWorker();
+    setInterval(updateWorkerStatusUI, 5000);
+    updateWorkerStatusUI();
 
     // Initialize Firebase data
     initializeData();

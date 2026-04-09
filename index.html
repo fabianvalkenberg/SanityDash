@@ -34,6 +34,10 @@
                 <a href="#" class="sidebar-btn sidebar-btn--active" data-page="overzicht">
                     <img src="assets/icons/pinpaper.svg" alt="Overzicht">
                 </a>
+                <a href="#" class="sidebar-btn" data-page="mail">
+                    <img src="assets/icons/mic.svg" alt="Mail dictatie">
+                    <span class="sidebar-badge" id="mailBadge"></span>
+                </a>
                 <a href="#" class="sidebar-btn" data-page="profiel">
                     <img src="assets/icons/profile.svg" alt="Profiel">
                 </a>
@@ -98,6 +102,40 @@
                 </div>
             </div>
         </main>
+
+        <!-- MAIL DICTATIE PAGINA -->
+        <main class="page page--mail" id="pageMail">
+            <div class="mail-container">
+                <div class="mail-input-section">
+                    <textarea class="mail-textarea" id="mailTranscript" placeholder="Spreek of typ je mail hier..."></textarea>
+                    <div class="mail-input-actions">
+                        <button class="mic-btn" id="mailMicBtn" title="Dictatie starten">
+                            <img src="assets/icons/mic.svg" alt="Mic">
+                        </button>
+                        <button class="mail-submit-btn" id="mailSubmitBtn">
+                            <img src="assets/icons/arrow-right.svg" alt="Versturen">
+                        </button>
+                    </div>
+                    <div class="mail-worker-status" id="mailWorkerStatus">
+                        <span class="mail-worker-dot"></span>
+                        <span class="mail-worker-label">LM Studio offline</span>
+                    </div>
+                </div>
+                <div class="mail-queue" id="mailQueue"></div>
+            </div>
+        </main>
+
+        <!-- MAIL RESULT MODAL -->
+        <div class="mail-result-modal" id="mailResultModal">
+            <div class="mail-result-content">
+                <div class="mail-result-subject" id="mailResultSubject"></div>
+                <div class="mail-result-body" id="mailResultBody"></div>
+                <div class="mail-result-actions">
+                    <button class="mail-result-close" id="mailResultClose">Sluiten</button>
+                    <button class="mail-result-copy" id="mailResultCopy">Kopieer</button>
+                </div>
+            </div>
+        </div>
 
         <!-- OVERZICHT PAGINA -->
         <main class="page page--overzicht active" id="pageOverzicht">
