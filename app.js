@@ -1,5 +1,5 @@
-import { getTasksFromCloud, saveTasksToCloud, subscribeToTasks, getContactsFromCloud, saveContactsToCloud, subscribeToMails, addMailToCloud, updateMailInCloud, deleteMailFromCloud } from './firebase.js';
-import { initMailWorker, updateWorkerMails, getWorkerStatus } from './mail-worker.js';
+import { getTasksFromCloud, saveTasksToCloud, subscribeToTasks, getContactsFromCloud, saveContactsToCloud } from './firebase.js';
+import { generateMail, checkLMStudio } from './mail-worker.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     const editModal = document.getElementById('editModal');
@@ -839,6 +839,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const category = column.dataset.category;
         const isPlanningOrInbox = category === 'planning' || category === 'inbox';
+        const isMailen = category === 'mailen';
 
         if (isPlanningOrInbox) {
             editInput.classList.remove('hidden');
@@ -850,6 +851,10 @@ document.addEventListener('DOMContentLoaded', () => {
             contactFields.classList.remove('hidden');
             timeSelector.classList.add('hidden');
         }
+
+        // Toon mail-sectie alleen voor mailen-taken (niet voor nieuwe, want nog niks om te dicteren op)
+        editMailSection.classList.toggle('hidden', !isMailen);
+        resetMailSection();
 
         if (isNew) {
             editInput.value = '';
@@ -876,6 +881,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 } else {
                     editContactName.value = taskData.naam || '';
                     editContactTask.value = taskData.taak || '';
+                    if (isMailen) {
+                        populateMailSection(taskData);
+                    }
                 }
             }
         }
@@ -898,6 +906,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function closeEditModal() {
         editModal.classList.remove('active');
+        stopMailRecording();
         currentTask = null;
         currentColumn = null;
         isNewTask = false;
@@ -1527,160 +1536,171 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ===================
-    // MAIL DICTATIE
+    // MAIL DICTATIE (in edit-modal)
     // ===================
-    let mailsData = [];
-    let currentMailResult = null;
+    const editMailSection = document.getElementById('editMailSection');
+    const editMailTranscript = document.getElementById('editMailTranscript');
+    const editMailMic = document.getElementById('editMailMic');
+    const editMailGenerate = document.getElementById('editMailGenerate');
+    const editMailStatus = document.getElementById('editMailStatus');
+    const editMailResult = document.getElementById('editMailResult');
+    const editMailResultSubject = document.getElementById('editMailResultSubject');
+    const editMailResultBody = document.getElementById('editMailResultBody');
+    const editMailRegen = document.getElementById('editMailRegen');
+    const editMailCopy = document.getElementById('editMailCopy');
+
     let speechRecognition = null;
     let isRecording = false;
+    let mailSpeechFinalTranscript = '';
 
-    const mailTranscript = document.getElementById('mailTranscript');
-    const mailMicBtn = document.getElementById('mailMicBtn');
-    const mailSubmitBtn = document.getElementById('mailSubmitBtn');
-    const mailQueueEl = document.getElementById('mailQueue');
-    const mailWorkerStatus = document.getElementById('mailWorkerStatus');
-    const mailResultModal = document.getElementById('mailResultModal');
-    const mailResultSubject = document.getElementById('mailResultSubject');
-    const mailResultBody = document.getElementById('mailResultBody');
-    const mailResultClose = document.getElementById('mailResultClose');
-    const mailResultCopy = document.getElementById('mailResultCopy');
+    function initMailSpeechRecognition() {
+        const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SR) return null;
 
-    function escapeHtml(s) {
-        if (!s) return '';
-        return String(s)
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#39;');
+        const rec = new SR();
+        rec.lang = 'nl-NL';
+        rec.continuous = true;
+        rec.interimResults = true;
+
+        rec.onresult = (event) => {
+            let interim = '';
+            for (let i = event.resultIndex; i < event.results.length; i++) {
+                const transcript = event.results[i][0].transcript;
+                if (event.results[i].isFinal) {
+                    mailSpeechFinalTranscript += transcript;
+                } else {
+                    interim += transcript;
+                }
+            }
+            editMailTranscript.value = mailSpeechFinalTranscript + interim;
+        };
+
+        rec.onerror = (event) => {
+            console.error('Speech recognition error:', event.error);
+            stopMailRecording();
+        };
+
+        rec.onend = () => {
+            if (isRecording) {
+                try { rec.start(); } catch (e) {}
+            }
+        };
+
+        return rec;
     }
 
-    function formatTimeAgo(iso) {
-        if (!iso) return '';
-        const diff = Date.now() - new Date(iso).getTime();
-        const sec = Math.floor(diff / 1000);
-        if (sec < 60) return 'net';
-        const min = Math.floor(sec / 60);
-        if (min < 60) return `${min}m`;
-        const hr = Math.floor(min / 60);
-        if (hr < 24) return `${hr}u`;
-        return `${Math.floor(hr / 24)}d`;
-    }
-
-    function statusLabel(status) {
-        switch (status) {
-            case 'pending': return 'wacht';
-            case 'processing': return 'bezig';
-            case 'done': return 'klaar';
-            case 'failed': return 'mislukt';
-            default: return status;
+    function startMailRecording() {
+        if (!speechRecognition) {
+            speechRecognition = initMailSpeechRecognition();
         }
-    }
-
-    function renderMailPage() {
-        if (!mailQueueEl) return;
-        mailQueueEl.innerHTML = '';
-
-        if (!mailsData || mailsData.length === 0) {
-            const empty = document.createElement('div');
-            empty.className = 'mail-empty';
-            empty.textContent = 'Nog geen mails in de queue.';
-            mailQueueEl.appendChild(empty);
-            updateMailBadge();
+        if (!speechRecognition) {
+            editMailTranscript.focus();
+            setMailStatus('Dictatie niet beschikbaar — gebruik de mic-knop op je toetsenbord', true);
             return;
         }
-
-        mailsData.forEach(mail => {
-            const item = document.createElement('div');
-            item.className = `mail-item mail-item--${mail.status}`;
-            item.dataset.mailId = mail.id;
-
-            const preview = (mail.transcript || '').slice(0, 140);
-            const modeLabel = mail.mode === 'claude' ? '⚡' : '🏠';
-
-            item.innerHTML = `
-                <div class="mail-item-header">
-                    <span class="mail-item-status">${statusLabel(mail.status)}</span>
-                    <span class="mail-item-mode">${modeLabel}</span>
-                    <span class="mail-item-time">${formatTimeAgo(mail.createdAt)}</span>
-                </div>
-                <div class="mail-item-transcript">${escapeHtml(preview)}${mail.transcript && mail.transcript.length > 140 ? '…' : ''}</div>
-                ${mail.status === 'done' ? `<div class="mail-item-subject">${escapeHtml(mail.subject || '')}</div>` : ''}
-                ${mail.status === 'failed' ? `<div class="mail-item-error">${escapeHtml(mail.error || 'onbekende fout')}</div>` : ''}
-                <div class="mail-item-actions">
-                    ${mail.status === 'pending' && mail.mode !== 'claude' ? `<button class="mail-item-btn mail-item-btn--escalate" data-action="escalate">⚡ nu</button>` : ''}
-                    ${mail.status === 'done' ? `<button class="mail-item-btn mail-item-btn--open" data-action="open">openen</button>` : ''}
-                    ${mail.status === 'failed' ? `<button class="mail-item-btn mail-item-btn--retry" data-action="retry">opnieuw</button>` : ''}
-                    <button class="mail-item-btn mail-item-btn--delete" data-action="delete">
-                        <img src="assets/icons/trash.svg" alt="Verwijderen">
-                    </button>
-                </div>
-            `;
-
-            item.querySelectorAll('[data-action]').forEach(btn => {
-                btn.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    const action = btn.dataset.action;
-                    handleMailAction(mail, action);
-                });
-            });
-
-            mailQueueEl.appendChild(item);
-        });
-
-        updateMailBadge();
+        isRecording = true;
+        mailSpeechFinalTranscript = editMailTranscript.value;
+        try {
+            speechRecognition.start();
+            editMailMic.classList.add('recording');
+        } catch (e) {
+            console.error(e);
+            isRecording = false;
+        }
     }
 
-    function updateMailBadge() {
-        const badge = document.getElementById('mailBadge');
-        if (!badge) return;
-        const count = mailsData.filter(m => m.status === 'done').length;
-        if (count > 0) {
-            badge.textContent = count;
-            badge.classList.add('visible');
+    function stopMailRecording() {
+        isRecording = false;
+        if (speechRecognition) {
+            try { speechRecognition.stop(); } catch (e) {}
+        }
+        if (editMailMic) editMailMic.classList.remove('recording');
+    }
+
+    function setMailStatus(text, isError = false) {
+        if (!editMailStatus) return;
+        editMailStatus.textContent = text || '';
+        editMailStatus.classList.toggle('error', !!isError);
+    }
+
+    function showMailResult(subject, body) {
+        editMailResultSubject.textContent = subject || '';
+        editMailResultBody.textContent = body || '';
+        editMailResult.classList.remove('hidden');
+    }
+
+    function hideMailResult() {
+        editMailResult.classList.add('hidden');
+        editMailResultSubject.textContent = '';
+        editMailResultBody.textContent = '';
+    }
+
+    function resetMailSection() {
+        stopMailRecording();
+        editMailTranscript.value = '';
+        setMailStatus('');
+        hideMailResult();
+    }
+
+    function populateMailSection(taskData) {
+        if (!taskData) {
+            resetMailSection();
+            return;
+        }
+        editMailTranscript.value = taskData.transcript || '';
+        if (taskData.subject && taskData.body) {
+            showMailResult(taskData.subject, taskData.body);
+            setMailStatus(taskData.mailSource ? `Eerder gegenereerd (${taskData.mailSource})` : 'Eerder gegenereerd');
         } else {
-            badge.classList.remove('visible');
+            hideMailResult();
+            setMailStatus('');
         }
     }
 
-    async function handleMailAction(mail, action) {
-        if (action === 'delete') {
-            await deleteMailFromCloud(mail.id);
-        } else if (action === 'escalate') {
-            await updateMailInCloud(mail.id, {
-                mode: 'claude',
-                status: 'pending',
-                workerLease: null,
-                attempts: 0,
-                error: null
-            });
-        } else if (action === 'retry') {
-            await updateMailInCloud(mail.id, {
-                status: 'pending',
-                workerLease: null,
-                attempts: 0,
-                error: null
-            });
-        } else if (action === 'open') {
-            openMailResultModal(mail);
+    async function handleGenerateMail() {
+        const transcript = editMailTranscript.value.trim();
+        if (!transcript) {
+            setMailStatus('Eerst transcript toevoegen', true);
+            return;
+        }
+        stopMailRecording();
+        editMailGenerate.disabled = true;
+        hideMailResult();
+        setMailStatus('Bezig…');
+        try {
+            const result = await generateMail(transcript, (msg) => setMailStatus(msg));
+            showMailResult(result.subject, result.body);
+            setMailStatus(result.source === 'lm-studio' ? 'Lokaal gegenereerd' : 'Via Claude gegenereerd');
+
+            // Sla op de task op zodat het bij heropen beschikbaar is
+            if (currentTask && !isNewTask) {
+                const taskCategory = currentTask.dataset.category;
+                const index = parseInt(currentTask.dataset.index);
+                if (tasksData[taskCategory] && tasksData[taskCategory][index]) {
+                    tasksData[taskCategory][index] = {
+                        ...tasksData[taskCategory][index],
+                        transcript,
+                        subject: result.subject,
+                        body: result.body,
+                        mailSource: result.source,
+                        mailGeneratedAt: new Date().toISOString()
+                    };
+                    await saveAllTasks();
+                }
+            }
+        } catch (error) {
+            console.error('[mail] generate failed:', error);
+            setMailStatus(error.message || 'Er ging iets mis', true);
+        } finally {
+            editMailGenerate.disabled = false;
         }
     }
 
-    function openMailResultModal(mail) {
-        currentMailResult = mail;
-        mailResultSubject.textContent = mail.subject || '';
-        mailResultBody.textContent = mail.body || '';
-        mailResultModal.classList.add('active');
-    }
-
-    function closeMailResultModal() {
-        mailResultModal.classList.remove('active');
-        currentMailResult = null;
-    }
-
-    async function copyMailResult() {
-        if (!currentMailResult) return;
-        const text = `Onderwerp: ${currentMailResult.subject}\n\n${currentMailResult.body}`;
+    async function handleCopyMail() {
+        const subject = editMailResultSubject.textContent || '';
+        const body = editMailResultBody.textContent || '';
+        if (!subject && !body) return;
+        const text = `Onderwerp: ${subject}\n\n${body}`;
         if (navigator.clipboard && navigator.clipboard.writeText) {
             try {
                 await navigator.clipboard.writeText(text);
@@ -1690,150 +1710,36 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
             fallbackCopy(text);
         }
-        mailResultCopy.textContent = 'Gekopieerd!';
-        setTimeout(() => { mailResultCopy.textContent = 'Kopieer'; }, 1500);
+        const orig = editMailCopy.textContent;
+        editMailCopy.textContent = 'Gekopieerd!';
+        setTimeout(() => { editMailCopy.textContent = orig; }, 1500);
     }
 
-    // ===================
-    // SPEECH RECOGNITION
-    // ===================
-    function initSpeechRecognition() {
-        const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-        if (!SR) return null;
-
-        const rec = new SR();
-        rec.lang = 'nl-NL';
-        rec.continuous = true;
-        rec.interimResults = true;
-
-        let finalTranscript = '';
-
-        rec.onresult = (event) => {
-            let interim = '';
-            for (let i = event.resultIndex; i < event.results.length; i++) {
-                const transcript = event.results[i][0].transcript;
-                if (event.results[i].isFinal) {
-                    finalTranscript += transcript;
-                } else {
-                    interim += transcript;
-                }
-            }
-            mailTranscript.value = finalTranscript + interim;
-        };
-
-        rec.onerror = (event) => {
-            console.error('Speech recognition error:', event.error);
-            stopRecording();
-        };
-
-        rec.onend = () => {
-            if (isRecording) {
-                // Auto-restart bij continuous mode
-                try { rec.start(); } catch (e) {}
-            }
-        };
-
-        rec._reset = () => { finalTranscript = mailTranscript.value; };
-        return rec;
+    function handleRegenerateMail() {
+        hideMailResult();
+        setMailStatus('');
+        handleGenerateMail();
     }
 
-    function startRecording() {
-        if (!speechRecognition) {
-            speechRecognition = initSpeechRecognition();
-        }
-        if (!speechRecognition) {
-            mailTranscript.focus();
-            alert('Dictatie niet beschikbaar in deze browser. Gebruik de microfoon-knop op je toetsenbord.');
-            return;
-        }
-        isRecording = true;
-        speechRecognition._reset();
-        try {
-            speechRecognition.start();
-            mailMicBtn.classList.add('recording');
-        } catch (e) {
-            console.error(e);
-            isRecording = false;
-        }
-    }
-
-    function stopRecording() {
-        isRecording = false;
-        if (speechRecognition) {
-            try { speechRecognition.stop(); } catch (e) {}
-        }
-        mailMicBtn.classList.remove('recording');
-    }
-
-    async function submitMailTranscript() {
-        const text = mailTranscript.value.trim();
-        if (!text) return;
-        stopRecording();
-        const id = await addMailToCloud({ transcript: text, mode: 'local' });
-        if (id) {
-            mailTranscript.value = '';
-        }
-    }
-
-    function updateWorkerStatusUI() {
-        if (!mailWorkerStatus) return;
-        const status = getWorkerStatus();
-        const label = mailWorkerStatus.querySelector('.mail-worker-label');
-        if (status.lmStudio && status.lmStudio.ok) {
-            mailWorkerStatus.classList.add('online');
-            if (label) label.textContent = `LM Studio online (${status.lmStudio.modelId || 'model'})`;
-        } else {
-            mailWorkerStatus.classList.remove('online');
-            if (label) label.textContent = 'LM Studio offline';
-        }
-    }
-
-    // Event listeners mail-pagina
-    if (mailMicBtn) {
-        mailMicBtn.addEventListener('click', () => {
-            if (isRecording) {
-                stopRecording();
-            } else {
-                startRecording();
-            }
+    // Event listeners mail-sectie
+    if (editMailMic) {
+        editMailMic.addEventListener('click', () => {
+            if (isRecording) stopMailRecording();
+            else startMailRecording();
         });
     }
-
-    if (mailSubmitBtn) {
-        mailSubmitBtn.addEventListener('click', submitMailTranscript);
+    if (editMailGenerate) {
+        editMailGenerate.addEventListener('click', handleGenerateMail);
+    }
+    if (editMailCopy) {
+        editMailCopy.addEventListener('click', handleCopyMail);
+    }
+    if (editMailRegen) {
+        editMailRegen.addEventListener('click', handleRegenerateMail);
     }
 
-    if (mailTranscript) {
-        mailTranscript.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-                e.preventDefault();
-                submitMailTranscript();
-            }
-        });
-    }
-
-    if (mailResultClose) {
-        mailResultClose.addEventListener('click', closeMailResultModal);
-    }
-    if (mailResultCopy) {
-        mailResultCopy.addEventListener('click', copyMailResult);
-    }
-    if (mailResultModal) {
-        mailResultModal.addEventListener('click', (e) => {
-            if (e.target === mailResultModal) closeMailResultModal();
-        });
-    }
-
-    // Subscribe naar mails + start worker
-    subscribeToMails((mails) => {
-        mailsData = mails || [];
-        updateWorkerMails(mailsData);
-        renderMailPage();
-    });
-
-    initMailWorker();
-    setInterval(updateWorkerStatusUI, 5000);
-    updateWorkerStatusUI();
+    // Initial LM Studio check (cache voor snellere eerste generate)
+    checkLMStudio().catch(() => {});
 
     // Initialize Firebase data
     initializeData();
